@@ -21,43 +21,77 @@ export default async function Home() {
     .eq('organization_id', appUser?.organization_id)
     .eq('status', 'active')
 
+  const orgName = (appUser?.organizations as any)?.name
+
   return (
-    <main style={{ padding: '2rem', color: 'white' }}>
-      <h1>Suit POS México</h1>
-      <p style={{ color: '#aaa' }}>
-        {appUser?.full_name} · {appUser?.role} · {(appUser?.organizations as any)?.name}
-      </p>
+    <main style={{ minHeight: '100vh', padding: 'var(--space-4)' }}>
+      <header
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          marginBottom: 'var(--space-4)',
+        }}
+      >
+        <div>
+          <h1 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>Suit POS México</h1>
+          <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: '0.9rem' }}>
+            {appUser?.full_name} · {appUser?.role} · {orgName}
+          </p>
+        </div>
 
-      <h2 style={{ marginTop: '2rem' }}>Tus giros</h2>
+        <form action="/auth/signout" method="post">
+          <button
+            type="submit"
+            style={{
+              background: 'transparent',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)',
+              padding: '0.5rem 1rem',
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+              fontSize: '0.85rem',
+            }}
+          >
+            Cerrar sesión
+          </button>
+        </form>
+      </header>
 
-      {misGiros?.length === 0 && <p>No tienes giros contratados todavía.</p>}
+      <h2 style={{ fontSize: '1.1rem', marginBottom: 'var(--space-2)', color: 'var(--text-muted)' }}>
+        Tus giros
+      </h2>
 
-      <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+      {misGiros?.length === 0 && (
+        <p style={{ color: 'var(--text-muted)' }}>No tienes giros contratados todavía.</p>
+      )}
+
+      <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
         {misGiros?.map((mg: any) => {
           const giroUrl = '/pos/' + mg.giros.slug
           return (
-            <a key={mg.id} href={giroUrl} style={{ textDecoration: 'none', color: 'inherit' }}>
+            <a key={mg.id} href={giroUrl} style={{ textDecoration: 'none' }}>
               <div
                 style={{
-                  border: '1px solid #444',
-                  borderRadius: '8px',
-                  padding: '1rem',
-                  width: '180px',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  borderLeft: '3px solid var(--accent)',
+                  borderRadius: 'var(--radius)',
+                  padding: 'var(--space-2)',
+                  width: '200px',
                   cursor: 'pointer',
                 }}
               >
-                <div style={{ fontSize: '2rem' }}>{mg.giros.icono}</div>
-                <strong>{mg.giros.nombre}</strong>
-                <p style={{ fontSize: '0.85rem', color: '#aaa' }}>{mg.giros.descripcion}</p>
+                <div style={{ fontSize: '1.75rem', marginBottom: '0.25rem' }}>{mg.giros.icono}</div>
+                <strong style={{ display: 'block', marginBottom: '0.25rem' }}>{mg.giros.nombre}</strong>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
+                  {mg.giros.descripcion}
+                </p>
               </div>
             </a>
           )
         })}
       </div>
-
-      <form action="/auth/signout" method="post" style={{ marginTop: '2rem' }}>
-        <button type="submit">Cerrar sesión</button>
-      </form>
     </main>
   )
 }

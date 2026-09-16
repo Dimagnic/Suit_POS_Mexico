@@ -85,68 +85,153 @@ export default function PosClient({
   }
 
   return (
-    <main style={{ display: 'flex', minHeight: '100vh', color: 'white' }}>
-      <section style={{ flex: 2, padding: '1.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-          <a href="/" style={{ color: '#aaa', textDecoration: 'none' }}>← Volver</a>
-          <h1 style={{ margin: 0 }}>{giro.icono} {giro.nombre}</h1>
+    <main style={{ display: 'flex', minHeight: '100vh' }}>
+      <section style={{ flex: '1 1 65%', padding: 'var(--space-3)' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-1)',
+            marginBottom: 'var(--space-3)',
+          }}
+        >
+          <a href="/" style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+            ← Volver
+          </a>
+          <h1 style={{ fontSize: '1.25rem' }}>
+            {giro.icono} {giro.nombre}
+          </h1>
         </div>
 
-        {products.length === 0 && <p style={{ color: '#aaa' }}>Este giro todavía no tiene productos cargados.</p>}
+        {products.length === 0 && (
+          <p style={{ color: 'var(--text-muted)' }}>Este giro todavía no tiene productos cargados.</p>
+        )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '1rem' }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
+            gap: 'var(--space-2)',
+          }}
+        >
           {products.map((p) => (
             <button
               key={p.id}
               onClick={() => addToCart(p)}
-              style={{ textAlign: 'left', background: '#1a1a1a', border: '1px solid #333', borderRadius: '8px', padding: '1rem', color: 'white', cursor: 'pointer' }}
+              style={{
+                textAlign: 'left',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)',
+                padding: 'var(--space-2)',
+                color: 'var(--text)',
+                cursor: 'pointer',
+                transition: 'border-color 0.15s',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--accent)')}
+              onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
             >
-              <strong>{p.name}</strong>
-              <p style={{ margin: '0.25rem 0', color: '#aaa', fontSize: '0.85rem' }}>
+              <strong style={{ display: 'block', marginBottom: '0.25rem' }}>{p.name}</strong>
+              <p style={{ margin: '0 0 0.5rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
                 {p.category ?? 'General'} · Stock: {p.stock_quantity} {p.unit}
               </p>
-              <p style={{ fontSize: '1.1rem', margin: 0 }}>${p.price.toFixed(2)}</p>
+              <p className="mono" style={{ fontSize: '1.1rem', margin: 0, color: 'var(--accent)' }}>
+                ${p.price.toFixed(2)}
+              </p>
             </button>
           ))}
         </div>
       </section>
 
-      <aside style={{ flex: 1, background: '#111', padding: '1.5rem', borderLeft: '1px solid #333', display: 'flex', flexDirection: 'column' }}>
-        <h2>Ticket</h2>
+      <aside
+        style={{
+          flex: '1 1 35%',
+          background: 'var(--surface-2)',
+          padding: 'var(--space-3)',
+          borderLeft: '1px solid var(--border)',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <h2 style={{ fontSize: '1.1rem', marginBottom: 'var(--space-2)' }}>Ticket</h2>
 
-        {cart.length === 0 && <p style={{ color: '#aaa' }}>Sin productos todavía.</p>}
+        {cart.length === 0 && (
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Sin productos todavía.</p>
+        )}
 
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {cart.map((l) => (
-            <div key={l.product.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <div
+              key={l.product.id}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '0.5rem 0',
+                borderBottom: '1px solid var(--border)',
+              }}
+            >
               <div>
-                <p style={{ margin: 0 }}>{l.product.name}</p>
-                <small style={{ color: '#aaa' }}>${l.product.price.toFixed(2)} c/u</small>
+                <p style={{ margin: 0, fontSize: '0.9rem' }}>{l.product.name}</p>
+                <small className="mono" style={{ color: 'var(--text-muted)' }}>
+                  ${l.product.price.toFixed(2)} c/u
+                </small>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <button onClick={() => changeQty(l.product.id, -1)}>-</button>
-                <span>{l.quantity}</span>
-                <button onClick={() => changeQty(l.product.id, 1)}>+</button>
+                <button
+                  onClick={() => changeQty(l.product.id, -1)}
+                  style={qtyBtnStyle}
+                >
+                  −
+                </button>
+                <span className="mono" style={{ minWidth: '1.5rem', textAlign: 'center' }}>
+                  {l.quantity}
+                </span>
+                <button
+                  onClick={() => changeQty(l.product.id, 1)}
+                  style={qtyBtnStyle}
+                >
+                  +
+                </button>
               </div>
             </div>
           ))}
         </div>
 
-        <div style={{ borderTop: '1px solid #333', paddingTop: '1rem', marginTop: '1rem' }}>
-          <p>Subtotal: ${subtotal.toFixed(2)}</p>
-          <p>IVA (16%): ${tax.toFixed(2)}</p>
-          <p style={{ fontSize: '1.2rem' }}><strong>Total: ${total.toFixed(2)}</strong></p>
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+            <span>Subtotal</span>
+            <span className="mono">${subtotal.toFixed(2)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+            <span>IVA (16%)</span>
+            <span className="mono">${tax.toFixed(2)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.25rem', fontWeight: 600 }}>
+            <span>Total</span>
+            <span className="mono">${total.toFixed(2)}</span>
+          </div>
 
           <button
             onClick={handleCheckout}
             disabled={cart.length === 0 || loading}
-            style={{ width: '100%', padding: '0.75rem', marginTop: '0.5rem', background: cart.length === 0 ? '#333' : '#22c55e', border: 'none', borderRadius: '6px', color: 'white', cursor: cart.length === 0 ? 'not-allowed' : 'pointer' }}
+            style={{
+              width: '100%',
+              padding: '0.85rem',
+              marginTop: 'var(--space-2)',
+              background: cart.length === 0 ? 'var(--border)' : 'var(--accent)',
+              border: 'none',
+              borderRadius: 'var(--radius)',
+              color: cart.length === 0 ? 'var(--text-muted)' : '#1a1206',
+              fontWeight: 600,
+              cursor: cart.length === 0 ? 'not-allowed' : 'pointer',
+            }}
           >
             {loading ? 'Procesando...' : 'Cobrar'}
           </button>
 
           {lastSale && (
-            <p style={{ color: 'lightgreen', marginTop: '0.5rem' }}>
+            <p style={{ color: 'var(--success)', marginTop: 'var(--space-1)', fontSize: '0.9rem' }}>
               ✓ Venta registrada — Total: ${lastSale.total.toFixed(2)}
             </p>
           )}
@@ -154,4 +239,16 @@ export default function PosClient({
       </aside>
     </main>
   )
+}
+
+const qtyBtnStyle: React.CSSProperties = {
+  width: '24px',
+  height: '24px',
+  borderRadius: '4px',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
+  color: 'var(--text)',
+  cursor: 'pointer',
+  fontSize: '0.9rem',
+  lineHeight: 1,
 }
