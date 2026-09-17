@@ -73,7 +73,7 @@ export default function AppointmentsClient({
 
   const refresh = async () => {
     const updated = await getAppointments(organizationId, giroId, today)
-    setAppointments(updated as Appointment[])
+    setAppointments(updated as any)
   }
 
   const handleCreate = async () => {
