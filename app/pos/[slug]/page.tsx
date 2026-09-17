@@ -66,6 +66,7 @@ export default async function PosPage({ params }: { params: Promise<{ slug: stri
         organizationId={appUser.organization_id}
         branchId={branch?.id ?? ''}
         giroId={giro.id}
+        giroSlug={giro.slug}
         giroNombre={giro.nombre}
         giroIcono={giro.icono}
         waiterId={user.id}

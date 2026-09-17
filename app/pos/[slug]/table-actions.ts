@@ -32,14 +32,36 @@ export async function getOrderItems(orderId: string) {
   const supabase = await createClient()
   const { data } = await supabase
     .from('table_order_items')
-    .select('id, product_id, quantity, unit_price, products(name)')
+    .select('id, product_id, quantity, unit_price, bottle_status, ml_restante, products(name, category, ml_total)')
     .eq('table_order_id', orderId)
     .order('created_at')
   return data ?? []
 }
 
-export async function addOrderItem(orderId: string, productId: string, unitPrice: number) {
+export async function updateBottleStatus(itemId: string, status: 'sellada' | 'abierta' | 'vacia') {
   const supabase = await createClient()
+  const mlRestante = status === 'vacia' ? 0 : status === 'sellada' ? null : undefined
+  await supabase
+    .from('table_order_items')
+    .update({ bottle_status: status, ...(mlRestante !== undefined ? { ml_restante: mlRestante } : {}) })
+    .eq('id', itemId)
+}
+
+export async function addOrderItem(orderId: string, productId: string, unitPrice: number, category?: string | null) {
+  const supabase = await createClient()
+
+  // Las botellas se rastrean una por una (cada una con su propio estado),
+  // nunca se agrupan en una sola línea con cantidad > 1.
+  if (category === 'botella') {
+    await supabase.from('table_order_items').insert({
+      table_order_id: orderId,
+      product_id: productId,
+      quantity: 1,
+      unit_price: unitPrice,
+      bottle_status: 'sellada',
+    })
+    return
+  }
 
   const { data: existing } = await supabase
     .from('table_order_items')
@@ -87,6 +109,7 @@ export async function closeTableOrder(
   organizationId: string,
   branchId: string,
   giroId: string,
+  giroSlug: string,
   cashierId: string
 ) {
   const supabase = await createClient()
@@ -139,7 +162,7 @@ export async function closeTableOrder(
     .eq('id', orderId)
   await supabase.from('restaurant_tables').update({ status: 'available' }).eq('id', tableId)
 
-  revalidatePath('/pos/restaurante')
+  revalidatePath(`/pos/${giroSlug}`)
 
   return { success: true, saleId: sale.id, total }
 }

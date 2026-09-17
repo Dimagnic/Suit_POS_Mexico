@@ -13,6 +13,7 @@ export default function TablesClient({
   organizationId,
   branchId,
   giroId,
+  giroSlug,
   giroNombre,
   giroIcono,
   waiterId,
@@ -22,6 +23,7 @@ export default function TablesClient({
   organizationId: string
   branchId: string
   giroId: string
+  giroSlug: string
   giroNombre: string
   giroIcono: string | null
   waiterId: string
@@ -47,6 +49,8 @@ export default function TablesClient({
         organizationId={organizationId}
         branchId={branchId}
         giroId={giroId}
+        giroSlug={giroSlug}
+        giroIcono={giroIcono}
         waiterId={waiterId}
         onBack={handleBack}
       />
@@ -86,7 +90,7 @@ export default function TablesClient({
                 textAlign: 'center',
               }}
             >
-              <div style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>🍽️</div>
+              <div style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>{giroIcono ?? '🍽️'}</div>
               <strong>{t.name}</strong>
               <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: occupied ? 'var(--accent)' : 'var(--text-muted)' }}>
                 {occupied ? 'Ocupada' : 'Disponible'}

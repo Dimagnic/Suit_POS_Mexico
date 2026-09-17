@@ -7,12 +7,21 @@ import {
   addOrderItem,
   changeOrderItemQty,
   closeTableOrder,
+  updateBottleStatus,
 } from './table-actions'
 import { generarFactura } from './invoice-actions'
 
 type Table = { id: string; name: string; status: string }
 type Product = { id: string; name: string; price: number; category: string | null }
-type OrderItem = { id: string; product_id: string; quantity: number; unit_price: number; products: { name: string } }
+type OrderItem = {
+  id: string
+  product_id: string
+  quantity: number
+  unit_price: number
+  bottle_status: 'sellada' | 'abierta' | 'vacia' | null
+  ml_restante: number | null
+  products: { name: string; category: string | null; ml_total: number | null }
+}
 
 export default function TableOrderClient({
   table,
@@ -20,6 +29,8 @@ export default function TableOrderClient({
   organizationId,
   branchId,
   giroId,
+  giroSlug,
+  giroIcono,
   waiterId,
   onBack,
 }: {
@@ -28,6 +39,8 @@ export default function TableOrderClient({
   organizationId: string
   branchId: string
   giroId: string
+  giroSlug: string
+  giroIcono: string | null
   waiterId: string
   onBack: () => void
 }) {
@@ -60,7 +73,12 @@ export default function TableOrderClient({
 
   const handleAdd = async (product: Product) => {
     if (!orderId) return
-    await addOrderItem(orderId, product.id, product.price)
+    await addOrderItem(orderId, product.id, product.price, product.category)
+    await refreshItems()
+  }
+
+  const handleBottleStatus = async (itemId: string, status: 'sellada' | 'abierta' | 'vacia') => {
+    await updateBottleStatus(itemId, status)
     await refreshItems()
   }
 
@@ -76,7 +94,7 @@ export default function TableOrderClient({
   const handleClose = async () => {
     if (!orderId) return
     setClosing(true)
-    const result = await closeTableOrder(orderId, table.id, organizationId, branchId, giroId, waiterId)
+    const result = await closeTableOrder(orderId, table.id, organizationId, branchId, giroId, giroSlug, waiterId)
     setClosing(false)
 
     if (result.error) {
@@ -168,7 +186,7 @@ export default function TableOrderClient({
           <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.9rem' }}>
             ← Mesas
           </button>
-          <h1 style={{ fontSize: '1.25rem' }}>🍽️ {table.name}</h1>
+          <h1 style={{ fontSize: '1.25rem' }}>{giroIcono ?? '🍽️'} {table.name}</h1>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 'var(--space-2)' }}>
@@ -213,30 +231,55 @@ export default function TableOrderClient({
         {items.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Sin productos todavía.</p>}
 
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          {items.map((item) => (
-            <div
-              key={item.id}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '0.5rem 0',
-                borderBottom: '1px solid var(--border)',
-              }}
-            >
-              <div>
-                <p style={{ margin: 0, fontSize: '0.9rem' }}>{item.products?.name}</p>
-                <small className="mono" style={{ color: 'var(--text-muted)' }}>
-                  ${item.unit_price.toFixed(2)} c/u
-                </small>
+          {items.map((item) => {
+            const isBottle = item.products?.category === 'botella'
+            const isCover = item.products?.category === 'cover'
+            return (
+              <div
+                key={item.id}
+                style={{
+                  padding: '0.5rem 0',
+                  borderBottom: '1px solid var(--border)',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <p style={{ margin: 0, fontSize: '0.9rem' }}>{item.products?.name}</p>
+                    <small className="mono" style={{ color: 'var(--text-muted)' }}>
+                      ${item.unit_price.toFixed(2)} {isCover ? '/ persona' : 'c/u'}
+                    </small>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <button onClick={() => handleQty(item.id, -1)} style={qtyBtnStyle}>−</button>
+                    <span className="mono" style={{ minWidth: '1.5rem', textAlign: 'center' }}>{item.quantity}</span>
+                    {!isBottle && <button onClick={() => handleQty(item.id, 1)} style={qtyBtnStyle}>+</button>}
+                  </div>
+                </div>
+
+                {isBottle && (
+                  <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem' }}>
+                    {(['sellada', 'abierta', 'vacia'] as const).map((status) => (
+                      <button
+                        key={status}
+                        onClick={() => handleBottleStatus(item.id, status)}
+                        style={{
+                          fontSize: '0.7rem',
+                          padding: '0.2rem 0.5rem',
+                          borderRadius: '999px',
+                          border: '1px solid var(--border)',
+                          cursor: 'pointer',
+                          background: item.bottle_status === status ? 'var(--accent)' : 'transparent',
+                          color: item.bottle_status === status ? '#1a1206' : 'var(--text-muted)',
+                        }}
+                      >
+                        {status === 'sellada' ? 'Sellada' : status === 'abierta' ? 'Abierta' : 'Vacía'}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <button onClick={() => handleQty(item.id, -1)} style={qtyBtnStyle}>−</button>
-                <span className="mono" style={{ minWidth: '1.5rem', textAlign: 'center' }}>{item.quantity}</span>
-                <button onClick={() => handleQty(item.id, 1)} style={qtyBtnStyle}>+</button>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         <div style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
