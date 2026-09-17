@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import PosClient from './pos-client'
 import TablesClient from './tables-client'
+import AppointmentsClient from './appointments-client'
+import { getAppointments, getServices } from './appointment-actions'
 
 export default async function PosPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
@@ -70,6 +72,31 @@ export default async function PosPage({ params }: { params: Promise<{ slug: stri
         giroNombre={giro.nombre}
         giroIcono={giro.icono}
         waiterId={user.id}
+      />
+    )
+  }
+
+  // Giros de agenda/citas: duración fija, sin mesas
+  const CITAS_GIROS = ['servicios', 'clinica_general', 'spa']
+  if (CITAS_GIROS.includes(giro.slug)) {
+    const today = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+    const [appointments, services] = await Promise.all([
+      getAppointments(appUser.organization_id, giro.id, today),
+      getServices(appUser.organization_id, giro.id),
+    ])
+
+    return (
+      <AppointmentsClient
+        initialAppointments={appointments as any}
+        services={services as any}
+        organizationId={appUser.organization_id}
+        branchId={branch?.id ?? ''}
+        giroId={giro.id}
+        giroSlug={giro.slug}
+        giroNombre={giro.nombre}
+        giroIcono={giro.icono}
+        cashierId={user.id}
+        today={today}
       />
     )
   }
