@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { checkout } from './actions'
+import { generarFactura } from './invoice-actions'
 
 type Product = {
   id: string
@@ -31,6 +32,16 @@ export default function PosClient({
   const [cart, setCart] = useState<CartLine[]>([])
   const [loading, setLoading] = useState(false)
   const [lastSale, setLastSale] = useState<{ id: string; total: number } | null>(null)
+
+  const [invoiceLoading, setInvoiceLoading] = useState(false)
+  const [invoiceResult, setInvoiceResult] = useState<{ success?: boolean; error?: string; uuid?: string } | null>(null)
+
+  const handleInvoice = async (saleId: string) => {
+    setInvoiceLoading(true)
+    const result = await generarFactura(saleId)
+    setInvoiceLoading(false)
+    setInvoiceResult(result)
+  }
 
   const addToCart = (product: Product) => {
     setCart((prev) => {
@@ -81,6 +92,7 @@ export default function PosClient({
     }
 
     setLastSale({ id: result.saleId!, total: result.total! })
+    setInvoiceResult(null)
     setCart([])
   }
 
@@ -178,19 +190,13 @@ export default function PosClient({
                 </small>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <button
-                  onClick={() => changeQty(l.product.id, -1)}
-                  style={qtyBtnStyle}
-                >
+                <button onClick={() => changeQty(l.product.id, -1)} style={qtyBtnStyle}>
                   −
                 </button>
                 <span className="mono" style={{ minWidth: '1.5rem', textAlign: 'center' }}>
                   {l.quantity}
                 </span>
-                <button
-                  onClick={() => changeQty(l.product.id, 1)}
-                  style={qtyBtnStyle}
-                >
+                <button onClick={() => changeQty(l.product.id, 1)} style={qtyBtnStyle}>
                   +
                 </button>
               </div>
@@ -231,9 +237,42 @@ export default function PosClient({
           </button>
 
           {lastSale && (
-            <p style={{ color: 'var(--success)', marginTop: 'var(--space-1)', fontSize: '0.9rem' }}>
-              ✓ Venta registrada — Total: ${lastSale.total.toFixed(2)}
-            </p>
+            <div style={{ marginTop: 'var(--space-1)' }}>
+              <p style={{ color: 'var(--success)', fontSize: '0.9rem', margin: '0 0 0.5rem' }}>
+                ✓ Venta registrada — Total: ${lastSale.total.toFixed(2)}
+              </p>
+
+              {!invoiceResult && (
+                <button
+                  onClick={() => handleInvoice(lastSale.id)}
+                  disabled={invoiceLoading}
+                  style={{
+                    width: '100%',
+                    padding: '0.6rem',
+                    background: 'transparent',
+                    border: '1px solid var(--accent)',
+                    borderRadius: 'var(--radius)',
+                    color: 'var(--accent)',
+                    cursor: invoiceLoading ? 'not-allowed' : 'pointer',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  {invoiceLoading ? 'Generando factura...' : 'Generar factura CFDI'}
+                </button>
+              )}
+
+              {invoiceResult?.success && (
+                <p style={{ color: 'var(--success)', fontSize: '0.85rem', marginTop: '0.5rem' }}>
+                  ✓ Facturado — UUID: <span className="mono">{invoiceResult.uuid}</span>
+                </p>
+              )}
+
+              {invoiceResult?.error && (
+                <p style={{ color: 'var(--danger)', fontSize: '0.85rem', marginTop: '0.5rem' }}>
+                  ✕ {invoiceResult.error}
+                </p>
+              )}
+            </div>
           )}
         </div>
       </aside>
