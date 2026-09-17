@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import PosClient from './pos-client'
+import TablesClient from './tables-client'
 
 export default async function PosPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
@@ -49,6 +50,27 @@ export default async function PosPage({ params }: { params: Promise<{ slug: stri
     .eq('is_main', true)
     .single()
 
+  // Giros con lógica especial (mesas, citas, etc.) se detectan por slug
+  if (giro.slug === 'restaurante') {
+    const { data: tables } = await supabase
+      .from('restaurant_tables')
+      .select('id, name, status')
+      .eq('organization_id', appUser.organization_id)
+      .order('name')
+
+    return (
+      <TablesClient
+        tables={tables ?? []}
+        products={products ?? []}
+        organizationId={appUser.organization_id}
+        branchId={branch?.id ?? ''}
+        giroId={giro.id}
+        waiterId={user.id}
+      />
+    )
+  }
+
+  // Resto de giros: catálogo de mostrador estándar
   return (
     <PosClient
       giro={giro}
