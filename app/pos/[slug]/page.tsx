@@ -50,21 +50,24 @@ export default async function PosPage({ params }: { params: Promise<{ slug: stri
     .eq('is_main', true)
     .single()
 
-  // Giros con lógica especial (mesas, citas, etc.) se detectan por slug
-  if (giro.slug === 'restaurante') {
+   // Giros con lógica especial (mesas, citas, etc.) se detectan por slug
+  if (giro.slug === 'restaurante' || giro.slug === 'bar') {
     const { data: tables } = await supabase
       .from('restaurant_tables')
       .select('id, name, status')
       .eq('organization_id', appUser.organization_id)
+      .eq('giro_id', giro.id)
       .order('name')
 
-    return (
+        return (
       <TablesClient
         tables={tables ?? []}
         products={products ?? []}
         organizationId={appUser.organization_id}
         branchId={branch?.id ?? ''}
         giroId={giro.id}
+        giroNombre={giro.nombre}
+        giroIcono={giro.icono}
         waiterId={user.id}
       />
     )

@@ -13,6 +13,8 @@ export default function TablesClient({
   organizationId,
   branchId,
   giroId,
+  giroNombre,
+  giroIcono,
   waiterId,
 }: {
   tables: Table[]
@@ -20,13 +22,15 @@ export default function TablesClient({
   organizationId: string
   branchId: string
   giroId: string
+  giroNombre: string
+  giroIcono: string | null
   waiterId: string
 }) {
   const [tableList, setTableList] = useState<Table[]>(tables)
   const [selectedTable, setSelectedTable] = useState<Table | null>(null)
 
-  const refreshTables = async () => {
-    const updated = await getTables(organizationId)
+    const refreshTables = async () => {
+    const updated = await getTables(organizationId, giroId)
     setTableList(updated as Table[])
   }
 
@@ -55,7 +59,7 @@ export default function TablesClient({
         <a href="/" style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
           ← Volver
         </a>
-        <h1 style={{ fontSize: '1.25rem' }}>🍽️ Restaurante — Mesas</h1>
+                <h1 style={{ fontSize: '1.25rem' }}>{giroIcono} {giroNombre} — Mesas</h1>
       </div>
 
       <div

@@ -144,12 +144,13 @@ export async function closeTableOrder(
   return { success: true, saleId: sale.id, total }
 }
 
-export async function getTables(organizationId: string) {
+export async function getTables(organizationId: string, giroId: string) {
   const supabase = await createClient()
   const { data } = await supabase
     .from('restaurant_tables')
     .select('id, name, status')
     .eq('organization_id', organizationId)
+    .eq('giro_id', giroId)
     .order('name')
   return data ?? []
 }
