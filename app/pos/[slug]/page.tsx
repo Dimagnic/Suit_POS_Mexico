@@ -1,3 +1,5 @@
+import GasClient from './gas-client'
+import { getPumps } from './gas-actions'
 import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import PosClient from './pos-client'
@@ -124,7 +126,23 @@ export default async function PosPage({ params }: { params: Promise<{ slug: stri
       />
     )
   }
+  // Gasolinera: bombas + litros
+  if (giro.slug === 'gasolinera') {
+    const pumps = await getPumps(appUser.organization_id, giro.id)
 
+    return (
+      <GasClient
+        pumps={pumps as any}
+        fuels={(products ?? []) as any}
+        organizationId={appUser.organization_id}
+        branchId={branch?.id ?? ''}
+        giroId={giro.id}
+        giroNombre={giro.nombre}
+        giroIcono={giro.icono}
+        cashierId={user.id}
+      />
+    )
+  }
   // Resto de giros: catálogo de mostrador estándar
   return (
     <PosClient
