@@ -40,22 +40,40 @@ export default async function Home() {
           </p>
         </div>
 
-        <form action="/auth/signout" method="post">
-          <button
-            type="submit"
+        <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
+          <a
+            href="/team"
             style={{
-              background: 'transparent',
+              display: 'flex',
+              alignItems: 'center',
               border: '1px solid var(--border)',
               borderRadius: 'var(--radius)',
               padding: '0.5rem 1rem',
               color: 'var(--text-muted)',
-              cursor: 'pointer',
+              textDecoration: 'none',
               fontSize: '0.85rem',
             }}
           >
-            Cerrar sesión
-          </button>
-        </form>
+            Equipo
+          </a>
+
+          <form action="/auth/signout" method="post">
+            <button
+              type="submit"
+              style={{
+                background: 'transparent',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)',
+                padding: '0.5rem 1rem',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                fontSize: '0.85rem',
+              }}
+            >
+              Cerrar sesión
+            </button>
+          </form>
+        </div>
       </header>
 
       <h2 style={{ fontSize: '1.1rem', marginBottom: 'var(--space-2)', color: 'var(--text-muted)' }}>
