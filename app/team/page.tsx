@@ -1,16 +1,20 @@
 import { redirect } from 'next/navigation'
-import { getTeamMembers } from './actions'
+import { getTeamMembers, getPendingInvites } from './actions'
 import { canManageTeam } from '@/lib/permissions'
 import TeamClient from './team-client'
 
 export default async function TeamPage() {
-  const result = await getTeamMembers()
+  const [result, invitesResult] = await Promise.all([
+    getTeamMembers(),
+    getPendingInvites(),
+  ])
 
   if ('error' in result) {
     redirect('/')
   }
 
   const { members, currentRole } = result
+  const invites = 'invites' in invitesResult ? invitesResult.invites ?? [] : []
 
   return (
     <main style={{ minHeight: '100vh', padding: 'var(--space-4)' }}>
@@ -33,7 +37,7 @@ export default async function TeamPage() {
         </p>
       </header>
 
-      <TeamClient members={members ?? []} currentRole={currentRole} />
+      <TeamClient members={members ?? []} currentRole={currentRole} invites={invites} />
     </main>
   )
 }
