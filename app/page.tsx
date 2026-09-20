@@ -1,5 +1,8 @@
+import { resolveActiveBranch } from '@/lib/branch'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { canManageTeam, type Role } from '@/lib/permissions'
+import BranchSwitcher from './branch-switcher'
 
 export default async function Home() {
   const supabase = await createClient()
@@ -11,7 +14,7 @@ export default async function Home() {
 
   const { data: appUser } = await supabase
     .from('app_users')
-    .select('full_name, role, organization_id, organizations(name)')
+    .select('full_name, role, organization_id, branch_id, organizations(name)')
     .eq('id', user.id)
     .single()
 
@@ -22,6 +25,31 @@ export default async function Home() {
     .eq('status', 'active')
 
   const orgName = (appUser?.organizations as any)?.name
+  const role = appUser?.role as Role
+  const canSeeAdmin = appUser ? canManageTeam(role) : false
+
+      let branches: { id: string; name: string; is_main: boolean }[] = []
+  let activeBranchId: string | null = null
+  if (canSeeAdmin && appUser) {
+    const { data } = await supabase
+      .from('branches')
+      .select('id, name, is_main')
+      .eq('organization_id', appUser.organization_id)
+      .order('name')
+    branches = data ?? []
+    activeBranchId = await resolveActiveBranch(supabase, appUser.organization_id, role, appUser.branch_id)
+  }
+
+  const linkStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius)',
+    padding: '0.5rem 1rem',
+    color: 'var(--text-muted)',
+    textDecoration: 'none',
+    fontSize: '0.85rem',
+  } as const
 
   return (
     <main style={{ minHeight: '100vh', padding: 'var(--space-4)' }}>
@@ -40,22 +68,14 @@ export default async function Home() {
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
-          <a
-            href="/team"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius)',
-              padding: '0.5rem 1rem',
-              color: 'var(--text-muted)',
-              textDecoration: 'none',
-              fontSize: '0.85rem',
-            }}
-          >
-            Equipo
-          </a>
+        <div style={{ display: 'flex', gap: 'var(--space-1)', alignItems: 'center' }}>
+                    {canSeeAdmin && branches.length > 1 ? (
+            <BranchSwitcher branches={branches} activeBranchId={activeBranchId} />
+          ) : null}
+
+          {canSeeAdmin ? <a href="/branches" style={linkStyle}>Sucursales</a> : null}
+
+          <a href="/team" style={linkStyle}>Equipo</a>
 
           <form action="/auth/signout" method="post">
             <button
@@ -80,9 +100,9 @@ export default async function Home() {
         Tus giros
       </h2>
 
-      {misGiros?.length === 0 && (
+      {misGiros?.length === 0 ? (
         <p style={{ color: 'var(--text-muted)' }}>No tienes giros contratados todavía.</p>
-      )}
+      ) : null}
 
       <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
         {misGiros?.map((mg: any) => {

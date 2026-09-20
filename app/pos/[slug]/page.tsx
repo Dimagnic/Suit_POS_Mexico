@@ -1,13 +1,15 @@
-import GasClient from './gas-client'
-import { getPumps } from './gas-actions'
 import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import PosClient from './pos-client'
 import TablesClient from './tables-client'
 import AppointmentsClient from './appointments-client'
 import HotelClient from './hotel-client'
+import GasClient from './gas-client'
 import { getAppointments, getServices } from './appointment-actions'
 import { getRooms, getRoomTypes } from './hotel-actions'
+import { getPumps } from './gas-actions'
+import { resolveActiveBranch } from '@/lib/branch'
+import type { Role } from '@/lib/permissions'
 
 export default async function PosPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
@@ -17,7 +19,7 @@ export default async function PosPage({ params }: { params: Promise<{ slug: stri
 
   const { data: appUser } = await supabase
     .from('app_users')
-    .select('organization_id')
+    .select('organization_id, role, branch_id')
     .eq('id', user.id)
     .single()
 
@@ -49,12 +51,14 @@ export default async function PosPage({ params }: { params: Promise<{ slug: stri
     .eq('is_active', true)
     .order('name')
 
-  const { data: branch } = await supabase
-    .from('branches')
-    .select('id')
-    .eq('organization_id', appUser.organization_id)
-    .eq('is_main', true)
-    .single()
+  // Sucursal activa: respeta la selección del owner/admin (cookie), luego la
+  // sucursal asignada al usuario, y solo al final la principal como respaldo.
+  const activeBranchId = await resolveActiveBranch(
+    supabase,
+    appUser.organization_id,
+    appUser.role as Role,
+    appUser.branch_id
+  )
 
   // Giros con lógica especial (mesas, citas, etc.) se detectan por slug
   if (giro.slug === 'restaurante' || giro.slug === 'bar') {
@@ -70,7 +74,7 @@ export default async function PosPage({ params }: { params: Promise<{ slug: stri
         tables={tables ?? []}
         products={products ?? []}
         organizationId={appUser.organization_id}
-        branchId={branch?.id ?? ''}
+        branchId={activeBranchId ?? ''}
         giroId={giro.id}
         giroSlug={giro.slug}
         giroNombre={giro.nombre}
@@ -80,7 +84,6 @@ export default async function PosPage({ params }: { params: Promise<{ slug: stri
     )
   }
 
-  // Giros de agenda/citas: duración fija, sin mesas
   const CITAS_GIROS = ['servicios', 'clinica_general', 'spa']
   if (CITAS_GIROS.includes(giro.slug)) {
     const today = new Date().toISOString().slice(0, 10)
@@ -94,7 +97,7 @@ export default async function PosPage({ params }: { params: Promise<{ slug: stri
         initialAppointments={appointments as any}
         services={services as any}
         organizationId={appUser.organization_id}
-        branchId={branch?.id ?? ''}
+        branchId={activeBranchId ?? ''}
         giroId={giro.id}
         giroSlug={giro.slug}
         giroNombre={giro.nombre}
@@ -105,7 +108,6 @@ export default async function PosPage({ params }: { params: Promise<{ slug: stri
     )
   }
 
-  // Hotel: habitaciones + reservaciones
   if (giro.slug === 'hotel') {
     const [rooms, roomTypes] = await Promise.all([
       getRooms(appUser.organization_id, giro.id),
@@ -117,7 +119,7 @@ export default async function PosPage({ params }: { params: Promise<{ slug: stri
         rooms={rooms as any}
         roomTypes={roomTypes as any}
         organizationId={appUser.organization_id}
-        branchId={branch?.id ?? ''}
+        branchId={activeBranchId ?? ''}
         giroId={giro.id}
         giroSlug={giro.slug}
         giroNombre={giro.nombre}
@@ -126,7 +128,7 @@ export default async function PosPage({ params }: { params: Promise<{ slug: stri
       />
     )
   }
-  // Gasolinera: bombas + litros
+
   if (giro.slug === 'gasolinera') {
     const pumps = await getPumps(appUser.organization_id, giro.id)
 
@@ -135,7 +137,7 @@ export default async function PosPage({ params }: { params: Promise<{ slug: stri
         pumps={pumps as any}
         fuels={(products ?? []) as any}
         organizationId={appUser.organization_id}
-        branchId={branch?.id ?? ''}
+        branchId={activeBranchId ?? ''}
         giroId={giro.id}
         giroNombre={giro.nombre}
         giroIcono={giro.icono}
@@ -143,13 +145,14 @@ export default async function PosPage({ params }: { params: Promise<{ slug: stri
       />
     )
   }
+
   // Resto de giros: catálogo de mostrador estándar
   return (
     <PosClient
       giro={giro}
       products={products ?? []}
       organizationId={appUser.organization_id}
-      branchId={branch?.id ?? ''}
+      branchId={activeBranchId ?? ''}
       cashierId={user.id}
     />
   )
