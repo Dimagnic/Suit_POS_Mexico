@@ -34,7 +34,13 @@ export default function PosClient({
   const [lastSale, setLastSale] = useState<{ id: string; total: number } | null>(null)
 
   const [invoiceLoading, setInvoiceLoading] = useState(false)
-  const [invoiceResult, setInvoiceResult] = useState<{ success?: boolean; error?: string; uuid?: string } | null>(null)
+  const [invoiceResult, setInvoiceResult] = useState<{
+    success?: boolean
+    error?: string
+    uuid?: string
+    xmlBase64?: string | null
+    pdfBase64?: string | null
+  } | null>(null)
 
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [esPublicoGeneral, setEsPublicoGeneral] = useState(true)
@@ -277,9 +283,49 @@ export default function PosClient({
               )}
 
               {invoiceResult?.success && (
-                <p style={{ color: 'var(--success)', fontSize: '0.85rem', marginTop: '0.5rem' }}>
-                  ✓ Facturado — UUID: <span className="mono">{invoiceResult.uuid}</span>
-                </p>
+                <div style={{ marginTop: '0.5rem' }}>
+                  <p style={{ color: 'var(--success)', fontSize: '0.85rem', margin: '0 0 0.5rem' }}>
+                    ✓ Facturado — UUID: <span className="mono">{invoiceResult.uuid}</span>
+                  </p>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    {invoiceResult.pdfBase64 && (
+                      
+                        href={`data:application/pdf;base64,${invoiceResult.pdfBase64}`}
+                        download={`factura-${invoiceResult.uuid}.pdf`}
+                        style={{
+                          flex: 1,
+                          textAlign: 'center',
+                          padding: '0.5rem',
+                          border: '1px solid var(--accent)',
+                          borderRadius: 'var(--radius)',
+                          color: 'var(--accent)',
+                          fontSize: '0.8rem',
+                          textDecoration: 'none',
+                        }}
+                      >
+                        Descargar PDF
+                      </a>
+                    )}
+                    {invoiceResult.xmlBase64 && (
+                      
+                        href={`data:application/xml;base64,${invoiceResult.xmlBase64}`}
+                        download={`factura-${invoiceResult.uuid}.xml`}
+                        style={{
+                          flex: 1,
+                          textAlign: 'center',
+                          padding: '0.5rem',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--radius)',
+                          color: 'var(--text)',
+                          fontSize: '0.8rem',
+                          textDecoration: 'none',
+                        }}
+                      >
+                        Descargar XML
+                      </a>
+                    )}
+                  </div>
+                </div>
               )}
 
               {invoiceResult?.error && !showInvoiceModal && (

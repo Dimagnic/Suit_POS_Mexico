@@ -180,7 +180,7 @@ export async function generarFactura(saleId: string, receptor?: ReceptorInput) {
   return {
     success: true,
     uuid: cfdi.Id ?? cfdi.Complement?.TaxStamp?.Uuid,
-    xmlOk: xmlResult.ok,
-    pdfOk: pdfResult.ok,
+    xmlBase64: xmlResult.ok ? xmlResult.base64 : null,
+    pdfBase64: pdfResult.ok ? pdfResult.base64 : null,
   }
 }
