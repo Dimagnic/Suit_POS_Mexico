@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { crearCfdi } from '@/lib/facturama/client'
+import { crearCfdi, descargarXml, descargarPdf } from '@/lib/facturama/client'
 
 type ReceptorInput = {
   rfc: string
@@ -148,8 +148,15 @@ export async function generarFactura(saleId: string, receptor?: ReceptorInput) {
   }
 
   const cfdi = result.data as any
+  const cfdiId = cfdi.Id ?? cfdi.Complement?.TaxStamp?.Uuid
 
-  await supabase.from('invoices').insert({
+  // Intentamos descargar XML y PDF, pero si falla no bloqueamos el timbrado ya exitoso
+  const [xmlResult, pdfResult] = await Promise.all([
+    descargarXml(cfdiId),
+    descargarPdf(cfdiId),
+  ])
+
+  const { error: insertError } = await supabase.from('invoices').insert({
     organization_id: sale.organization_id,
     sale_id: sale.id,
     uuid_fiscal: cfdi.Id ?? cfdi.Complement?.TaxStamp?.Uuid ?? null,
@@ -161,8 +168,19 @@ export async function generarFactura(saleId: string, receptor?: ReceptorInput) {
     total: sale.total,
     status: 'stamped',
     pac_response: cfdi,
+    xml_content: xmlResult.ok ? xmlResult.base64 : null,
+    pdf_content: pdfResult.ok ? pdfResult.base64 : null,
     issued_at: new Date().toISOString(),
   })
 
-  return { success: true, uuid: cfdi.Id ?? cfdi.Complement?.TaxStamp?.Uuid }
+  if (insertError) {
+    return { error: 'Se timbró correctamente pero no se pudo guardar en la base de datos: ' + insertError.message }
+  }
+
+  return {
+    success: true,
+    uuid: cfdi.Id ?? cfdi.Complement?.TaxStamp?.Uuid,
+    xmlOk: xmlResult.ok,
+    pdfOk: pdfResult.ok,
+  }
 }
