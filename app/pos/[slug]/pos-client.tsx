@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
 import { checkout } from './actions'
@@ -288,10 +288,11 @@ export default function PosClient({
                     ✓ Facturado — UUID: <span className="mono">{invoiceResult.uuid}</span>
                   </p>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    {invoiceResult.pdfBase64 && (
+                    {invoiceResult.pdfBase64 ? (
                       
-                        href={`data:application/pdf;base64,${invoiceResult.pdfBase64}`}
-                        download={`factura-${invoiceResult.uuid}.pdf`}
+                        <a
+                        href={'data:application/pdf;base64,' + invoiceResult.pdfBase64}
+                        download={'factura-' + invoiceResult.uuid + '.pdf'}
                         style={{
                           flex: 1,
                           textAlign: 'center',
@@ -305,11 +306,12 @@ export default function PosClient({
                       >
                         Descargar PDF
                       </a>
-                    )}
-                    {invoiceResult.xmlBase64 && (
+                    ) : null}
+                    {invoiceResult.xmlBase64 ? (
                       
-                        href={`data:application/xml;base64,${invoiceResult.xmlBase64}`}
-                        download={`factura-${invoiceResult.uuid}.xml`}
+                        <a
+                        href={'data:application/xml;base64,' + invoiceResult.xmlBase64}
+                        download={'factura-' + invoiceResult.uuid + '.xml'}
                         style={{
                           flex: 1,
                           textAlign: 'center',
@@ -323,22 +325,22 @@ export default function PosClient({
                       >
                         Descargar XML
                       </a>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               )}
 
-              {invoiceResult?.error && !showInvoiceModal && (
+              {invoiceResult?.error && !showInvoiceModal ? (
                 <p style={{ color: 'var(--danger)', fontSize: '0.85rem', marginTop: '0.5rem' }}>
                   ✕ {invoiceResult.error}
                 </p>
-              )}
+              ) : null}
             </div>
           )}
         </div>
       </aside>
 
-      {showInvoiceModal && lastSale && (
+      {showInvoiceModal && lastSale ? (
         <div
           style={{
             position: 'fixed',
@@ -370,7 +372,7 @@ export default function PosClient({
               Facturar a Público en General
             </label>
 
-            {!esPublicoGeneral && (
+            {!esPublicoGeneral ? (
               <>
                 <input
                   placeholder="RFC"
@@ -399,11 +401,11 @@ export default function PosClient({
                   <option value="P01">P01 - Por definir</option>
                 </select>
               </>
-            )}
+            ) : null}
 
-            {invoiceResult?.error && (
+            {invoiceResult?.error ? (
               <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>✕ {invoiceResult.error}</p>
-            )}
+            ) : null}
 
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'var(--space-2)' }}>
               <button
@@ -439,7 +441,7 @@ export default function PosClient({
             </div>
           </div>
         </div>
-      )}
+      ) : null}
     </main>
   )
 }
