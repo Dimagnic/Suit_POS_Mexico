@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { canManageTeam, canAssignRole, type Role } from '@/lib/permissions'
 import { revalidatePath } from 'next/cache'
+import { resend } from '@/lib/resend/client'
 
 async function getCurrentUserRole() {
   const supabase = await createClient()
@@ -133,26 +134,27 @@ export async function createInvite(email: string, role: Role) {
     return { error: error.message }
   }
 
-  revalidatePath('/team')
-  const { resend } = await import('@/lib/resend/client')
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
-
+  // Envío del correo de invitación real. Si falla, no bloqueamos el flujo:
+  // la invitación ya quedó guardada en la base de datos y se puede reenviar
+  // manualmente después si hace falta.
   try {
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
     await resend.emails.send({
       from: 'Suit POS México <onboarding@resend.dev>',
-      to: email,
+      to: normalizedEmail,
       subject: 'Te invitaron a un equipo en Suit POS México',
       html: `
         <p>Hola,</p>
         <p>Te invitaron a unirte a un equipo en Suit POS México con el rol de <strong>${role}</strong>.</p>
-        <p>Entra con tu cuenta de Google usando este correo (${email}) para aceptar:</p>
+        <p>Entra con tu cuenta de Google usando este correo (${normalizedEmail}) para aceptar la invitación:</p>
         <p><a href="${siteUrl}/login">${siteUrl}/login</a></p>
       `,
     })
   } catch (emailError) {
     console.error('Error enviando correo de invitación:', emailError)
-    // No bloqueamos la invitación si el correo falla — ya quedó guardada en la base de datos
   }
+
+  revalidatePath('/team')
   return { success: true }
 }
 
@@ -175,6 +177,3 @@ export async function cancelInvite(inviteId: string) {
   revalidatePath('/team')
   return { success: true }
 }
-
-
-esta bien este codigo , sin cambiar nada dale orden
