@@ -134,6 +134,25 @@ export async function createInvite(email: string, role: Role) {
   }
 
   revalidatePath('/team')
+  const { resend } = await import('@/lib/resend/client')
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
+
+  try {
+    await resend.emails.send({
+      from: 'Suit POS México <onboarding@resend.dev>',
+      to: email,
+      subject: 'Te invitaron a un equipo en Suit POS México',
+      html: `
+        <p>Hola,</p>
+        <p>Te invitaron a unirte a un equipo en Suit POS México con el rol de <strong>${role}</strong>.</p>
+        <p>Entra con tu cuenta de Google usando este correo (${email}) para aceptar:</p>
+        <p><a href="${siteUrl}/login">${siteUrl}/login</a></p>
+      `,
+    })
+  } catch (emailError) {
+    console.error('Error enviando correo de invitación:', emailError)
+    // No bloqueamos la invitación si el correo falla — ya quedó guardada en la base de datos
+  }
   return { success: true }
 }
 
