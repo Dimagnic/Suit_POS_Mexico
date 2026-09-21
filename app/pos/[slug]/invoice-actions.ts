@@ -3,8 +3,54 @@
 import { createClient } from '@/lib/supabase/server'
 import { crearCfdi } from '@/lib/facturama/client'
 
-export async function generarFactura(saleId: string) {
+type ReceptorInput = {
+  rfc: string
+  razonSocial: string
+  regimenFiscal: string
+  usoCfdi: string
+}
+
+const RFC_PUBLICO_GENERAL = 'XAXX010101000'
+
+function validarRfc(rfc: string): boolean {
+  const rfcRegex = /^([A-ZÑ&]{3,4})\d{6}[A-Z0-9]{3}$/
+  return rfcRegex.test(rfc.trim().toUpperCase())
+}
+
+export async function generarFactura(saleId: string, receptor?: ReceptorInput) {
   const supabase = await createClient()
+
+  // Receptor por defecto: Público en General
+  let receptorFinal = {
+    rfc: RFC_PUBLICO_GENERAL,
+    razonSocial: 'PUBLICO EN GENERAL',
+    regimenFiscal: '616',
+    usoCfdi: 'S01',
+  }
+
+  if (receptor && receptor.rfc.trim() !== '') {
+    const rfcLimpio = receptor.rfc.trim().toUpperCase()
+
+    if (!validarRfc(rfcLimpio)) {
+      return { error: 'El RFC no tiene un formato válido. Verifícalo e intenta de nuevo.' }
+    }
+    if (!receptor.razonSocial.trim()) {
+      return { error: 'Falta la razón social del receptor.' }
+    }
+    if (!receptor.regimenFiscal) {
+      return { error: 'Falta el régimen fiscal del receptor.' }
+    }
+    if (!receptor.usoCfdi) {
+      return { error: 'Falta el uso de CFDI.' }
+    }
+
+    receptorFinal = {
+      rfc: rfcLimpio,
+      razonSocial: receptor.razonSocial.trim().toUpperCase(),
+      regimenFiscal: receptor.regimenFiscal,
+      usoCfdi: receptor.usoCfdi,
+    }
+  }
 
   const { data: sale, error: saleError } = await supabase
     .from('sales')
@@ -71,10 +117,10 @@ export async function generarFactura(saleId: string) {
     PaymentMethod: 'PUE',
     Exportation: '01',
     Receiver: {
-      Rfc: 'XAXX010101000',
-      Name: 'PUBLICO EN GENERAL',
-      CfdiUse: 'S01',
-      FiscalRegime: '616',
+      Rfc: receptorFinal.rfc,
+      Name: receptorFinal.razonSocial,
+      CfdiUse: receptorFinal.usoCfdi,
+      FiscalRegime: receptorFinal.regimenFiscal,
       TaxZipCode: fiscalProfile.codigo_postal,
     },
     GlobalInformation: {
@@ -91,9 +137,9 @@ export async function generarFactura(saleId: string) {
     await supabase.from('invoices').insert({
       organization_id: sale.organization_id,
       sale_id: sale.id,
-      receptor_rfc: 'XAXX010101000',
-      receptor_razon_social: 'PUBLICO EN GENERAL',
-      uso_cfdi: 'S01',
+      receptor_rfc: receptorFinal.rfc,
+      receptor_razon_social: receptorFinal.razonSocial,
+      uso_cfdi: receptorFinal.usoCfdi,
       total: sale.total,
       status: 'error',
       pac_response: result.error,
@@ -109,9 +155,9 @@ export async function generarFactura(saleId: string) {
     uuid_fiscal: cfdi.Id ?? cfdi.Complement?.TaxStamp?.Uuid ?? null,
     serie: cfdi.Serie ?? 'T',
     folio: cfdi.Folio ?? null,
-    receptor_rfc: 'XAXX010101000',
-    receptor_razon_social: 'PUBLICO EN GENERAL',
-    uso_cfdi: 'S01',
+    receptor_rfc: receptorFinal.rfc,
+    receptor_razon_social: receptorFinal.razonSocial,
+    uso_cfdi: receptorFinal.usoCfdi,
     total: sale.total,
     status: 'stamped',
     pac_response: cfdi,

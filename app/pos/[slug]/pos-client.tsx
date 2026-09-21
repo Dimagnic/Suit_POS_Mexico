@@ -36,11 +36,23 @@ export default function PosClient({
   const [invoiceLoading, setInvoiceLoading] = useState(false)
   const [invoiceResult, setInvoiceResult] = useState<{ success?: boolean; error?: string; uuid?: string } | null>(null)
 
-  const handleInvoice = async (saleId: string) => {
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false)
+  const [esPublicoGeneral, setEsPublicoGeneral] = useState(true)
+  const [rfc, setRfc] = useState('')
+  const [razonSocial, setRazonSocial] = useState('')
+  const [regimenFiscal, setRegimenFiscal] = useState('601')
+  const [usoCfdi, setUsoCfdi] = useState('G03')
+
+  const handleInvoiceSubmit = async () => {
+    if (!lastSale) return
     setInvoiceLoading(true)
-    const result = await generarFactura(saleId)
+    const result = await generarFactura(
+      lastSale.id,
+      esPublicoGeneral ? undefined : { rfc, razonSocial, regimenFiscal, usoCfdi }
+    )
     setInvoiceLoading(false)
     setInvoiceResult(result)
+    if (!result.error) setShowInvoiceModal(false)
   }
 
   const addToCart = (product: Product) => {
@@ -93,6 +105,9 @@ export default function PosClient({
 
     setLastSale({ id: result.saleId!, total: result.total! })
     setInvoiceResult(null)
+    setEsPublicoGeneral(true)
+    setRfc('')
+    setRazonSocial('')
     setCart([])
   }
 
@@ -242,9 +257,9 @@ export default function PosClient({
                 ✓ Venta registrada — Total: ${lastSale.total.toFixed(2)}
               </p>
 
-              {!invoiceResult && (
+              {!invoiceResult?.success && (
                 <button
-                  onClick={() => handleInvoice(lastSale.id)}
+                  onClick={() => setShowInvoiceModal(true)}
                   disabled={invoiceLoading}
                   style={{
                     width: '100%',
@@ -267,7 +282,7 @@ export default function PosClient({
                 </p>
               )}
 
-              {invoiceResult?.error && (
+              {invoiceResult?.error && !showInvoiceModal && (
                 <p style={{ color: 'var(--danger)', fontSize: '0.85rem', marginTop: '0.5rem' }}>
                   ✕ {invoiceResult.error}
                 </p>
@@ -276,6 +291,109 @@ export default function PosClient({
           )}
         </div>
       </aside>
+
+      {showInvoiceModal && lastSale && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 50,
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--surface)',
+              borderRadius: 'var(--radius)',
+              padding: 'var(--space-3)',
+              width: '90%',
+              maxWidth: '420px',
+            }}
+          >
+            <h3 style={{ marginTop: 0 }}>Datos de facturación</h3>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: 'var(--space-2)' }}>
+              <input
+                type="checkbox"
+                checked={esPublicoGeneral}
+                onChange={(e) => setEsPublicoGeneral(e.target.checked)}
+              />
+              Facturar a Público en General
+            </label>
+
+            {!esPublicoGeneral && (
+              <>
+                <input
+                  placeholder="RFC"
+                  value={rfc}
+                  onChange={(e) => setRfc(e.target.value.toUpperCase())}
+                  style={inputStyle}
+                />
+                <input
+                  placeholder="Razón social"
+                  value={razonSocial}
+                  onChange={(e) => setRazonSocial(e.target.value)}
+                  style={inputStyle}
+                />
+                <select value={regimenFiscal} onChange={(e) => setRegimenFiscal(e.target.value)} style={inputStyle}>
+                  <option value="601">601 - General de Ley Personas Morales</option>
+                  <option value="603">603 - Personas Morales con Fines no Lucrativos</option>
+                  <option value="605">605 - Sueldos y Salarios</option>
+                  <option value="612">612 - Personas Físicas con Actividades Empresariales</option>
+                  <option value="621">621 - Incorporación Fiscal</option>
+                  <option value="626">626 - Régimen Simplificado de Confianza</option>
+                </select>
+                <select value={usoCfdi} onChange={(e) => setUsoCfdi(e.target.value)} style={inputStyle}>
+                  <option value="G01">G01 - Adquisición de mercancías</option>
+                  <option value="G03">G03 - Gastos en general</option>
+                  <option value="I08">I08 - Otra maquinaria y equipo</option>
+                  <option value="P01">P01 - Por definir</option>
+                </select>
+              </>
+            )}
+
+            {invoiceResult?.error && (
+              <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>✕ {invoiceResult.error}</p>
+            )}
+
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'var(--space-2)' }}>
+              <button
+                onClick={() => setShowInvoiceModal(false)}
+                style={{
+                  flex: 1,
+                  padding: '0.6rem',
+                  background: 'transparent',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius)',
+                  color: 'var(--text)',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleInvoiceSubmit}
+                disabled={invoiceLoading}
+                style={{
+                  flex: 1,
+                  padding: '0.6rem',
+                  background: 'var(--accent)',
+                  color: '#1a1206',
+                  border: 'none',
+                  borderRadius: 'var(--radius)',
+                  fontWeight: 600,
+                  cursor: invoiceLoading ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {invoiceLoading ? 'Generando...' : 'Timbrar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
@@ -290,4 +408,14 @@ const qtyBtnStyle: React.CSSProperties = {
   cursor: 'pointer',
   fontSize: '0.9rem',
   lineHeight: 1,
+}
+
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '0.6rem',
+  marginBottom: '0.6rem',
+  borderRadius: '6px',
+  border: '1px solid var(--border)',
+  background: 'var(--surface-2)',
+  color: 'var(--text)',
 }
