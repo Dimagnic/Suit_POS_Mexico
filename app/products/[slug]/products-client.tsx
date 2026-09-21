@@ -97,7 +97,7 @@ export default function ProductsClient({
       const result = await createProduct(giroId, input)
       if (result?.error) { setErrorMsg(result.error); return }
       setRows((prev) => [...prev, {
-        id: crypto.randomUUID(), sku: input.sku || null, name: input.name, price: input.price,
+        id: result.id, sku: input.sku || null, name: input.name, price: input.price,
         cost: input.cost, stock_quantity: input.stockQuantity, unit: input.unit,
         category: input.category || null, duration_minutes: input.durationMinutes, is_active: true,
       }])

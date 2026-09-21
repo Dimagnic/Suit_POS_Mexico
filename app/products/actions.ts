@@ -86,23 +86,32 @@ export async function createProduct(giroId: string, input: ProductInput) {
 
   if (!input.name.trim()) return { error: 'El nombre es obligatorio.' }
 
-  const { error } = await supabase.from('products').insert({
-    organization_id: current.organization_id,
-    giro_id: giroId,
-    sku: input.sku.trim() || null,
-    name: input.name.trim(),
-    price: input.price,
-    cost: input.cost,
-    stock_quantity: input.stockQuantity,
-    unit: input.unit.trim() || 'pza',
-    category: input.category.trim() || null,
-    duration_minutes: input.durationMinutes,
-    is_active: true,
-  })
+  const { data, error } = await supabase
+    .from('products')
+    .insert({
+      organization_id: current.organization_id,
+      giro_id: giroId,
+      sku: input.sku.trim() || null,
+      name: input.name.trim(),
+      price: input.price,
+      cost: input.cost,
+      stock_quantity: input.stockQuantity,
+      unit: input.unit.trim() || 'pza',
+      category: input.category.trim() || null,
+      duration_minutes: input.durationMinutes,
+      is_active: true,
+    })
+    .select('id')
+    .single()
 
   if (error) return { error: error.message }
   revalidatePath('/products')
-  return { success: true }
+  // Regresamos el id real que asignó la base de datos — el cliente lo
+  // necesita para poder editar/desactivar el producto sin recargar la
+  // página (antes se usaba un id inventado en el navegador que nunca
+  // coincidía con el registro real, causando "Ese producto no pertenece
+  // a tu organización" al intentar editarlo justo después de crearlo).
+  return { success: true, id: data.id }
 }
 
 export async function updateProduct(productId: string, input: ProductInput) {
