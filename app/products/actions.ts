@@ -15,7 +15,49 @@ async function getCurrentUser() {
     .single()
   return appUser
 }
+async function existeProductoDuplicado(
+  supabase: any,
+  organizationId: string,
+  giroId: string,
+  name: string,
+  sku: string | null,
+  excludeProductId?: string
+) {
+  let query = supabase
+    .from('products')
+    .select('id, name, sku')
+    .eq('organization_id', organizationId)
+    .eq('giro_id', giroId)
 
+  if (excludeProductId) {
+    query = query.neq('id', excludeProductId)
+  }
+
+  const { data: candidatos } = await query
+
+  if (!candidatos) return null
+
+  const nameNormalizado = name.trim().toLowerCase()
+  const skuNormalizado = sku?.trim().toLowerCase()
+
+  const duplicadoPorNombre = candidatos.find(
+    (p: any) => p.name.trim().toLowerCase() === nameNormalizado
+  )
+  if (duplicadoPorNombre) {
+    return { tipo: 'nombre' as const, producto: duplicadoPorNombre }
+  }
+
+  if (skuNormalizado) {
+    const duplicadoPorSku = candidatos.find(
+      (p: any) => p.sku && p.sku.trim().toLowerCase() === skuNormalizado
+    )
+    if (duplicadoPorSku) {
+      return { tipo: 'sku' as const, producto: duplicadoPorSku }
+    }
+  }
+
+  return null
+}
 export async function getGirosConProductos() {
   const supabase = await createClient()
   const current = await getCurrentUser()
@@ -86,6 +128,20 @@ export async function createProduct(giroId: string, input: ProductInput) {
 
   if (!input.name.trim()) return { error: 'El nombre es obligatorio.' }
 
+  const duplicado = await existeProductoDuplicado(
+    supabase,
+    current.organization_id,
+    giroId,
+    input.name,
+    input.sku
+  )
+  if (duplicado) {
+    if (duplicado.tipo === 'nombre') {
+      return { error: `Ya existe un producto llamado "${duplicado.producto.name}" en este giro.` }
+    }
+    return { error: `El SKU "${duplicado.producto.sku}" ya está en uso por "${duplicado.producto.name}".` }
+  }
+
   const { data, error } = await supabase
     .from('products')
     .insert({
@@ -106,11 +162,6 @@ export async function createProduct(giroId: string, input: ProductInput) {
 
   if (error) return { error: error.message }
   revalidatePath('/products')
-  // Regresamos el id real que asignó la base de datos — el cliente lo
-  // necesita para poder editar/desactivar el producto sin recargar la
-  // página (antes se usaba un id inventado en el navegador que nunca
-  // coincidía con el registro real, causando "Ese producto no pertenece
-  // a tu organización" al intentar editarlo justo después de crearlo).
   return { success: true, id: data.id }
 }
 
@@ -120,9 +171,24 @@ export async function updateProduct(productId: string, input: ProductInput) {
   if (!current) return { error: 'No autenticado' }
   if (!canEditCatalog(current.role as Role)) return { error: 'No tienes permiso para editar el catálogo.' }
 
-  const { data: target } = await supabase.from('products').select('organization_id').eq('id', productId).single()
+  const { data: target } = await supabase.from('products').select('organization_id, giro_id').eq('id', productId).single()
   if (!target || target.organization_id !== current.organization_id) {
     return { error: 'Ese producto no pertenece a tu organización.' }
+  }
+
+  const duplicado = await existeProductoDuplicado(
+    supabase,
+    current.organization_id,
+    target.giro_id,
+    input.name,
+    input.sku,
+    productId
+  )
+  if (duplicado) {
+    if (duplicado.tipo === 'nombre') {
+      return { error: `Ya existe un producto llamado "${duplicado.producto.name}" en este giro.` }
+    }
+    return { error: `El SKU "${duplicado.producto.sku}" ya está en uso por "${duplicado.producto.name}".` }
   }
 
   const { error } = await supabase
@@ -143,7 +209,6 @@ export async function updateProduct(productId: string, input: ProductInput) {
   revalidatePath('/products')
   return { success: true }
 }
-
 export async function toggleProductActive(productId: string, active: boolean) {
   const supabase = await createClient()
   const current = await getCurrentUser()
