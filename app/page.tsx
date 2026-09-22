@@ -75,6 +75,9 @@ export default async function Home() {
 
           {canSeeAdmin ? <a href="/branches" style={linkStyle}>Sucursales</a> : null}
           {canSeeAdmin ? <a href="/products" style={linkStyle}>Productos</a> : null}
+          {canSeeAdmin ? <a href="/inventory" style={linkStyle}>Inventario</a> : null}
+          {canSeeAdmin ? <a href="/suppliers" style={linkStyle}>Proveedores</a> : null}
+          {canSeeAdmin ? <a href="/purchase-orders" style={linkStyle}>Compras</a> : null}
           {canSeeAdmin ? <a href="/reports" style={linkStyle}>Reportes</a> : null}
           {canSeeAdmin ? <a href="/subscription" style={linkStyle}>Suscripción</a> : null}
 
