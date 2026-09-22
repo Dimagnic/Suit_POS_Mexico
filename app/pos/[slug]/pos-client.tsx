@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { checkout } from './actions'
 import { generarFactura } from './invoice-actions'
 
@@ -15,6 +15,39 @@ type Product = {
 }
 
 type CartLine = { product: Product; quantity: number }
+
+const TOOLS = [
+  {
+    id: 'scan',
+    icon: '🔎',
+    label: 'Escáner',
+    info: 'Ya funciona: cualquier lector de código de barras USB actúa como teclado. Haz clic aquí para enfocar el campo de escaneo y pasa el producto.',
+  },
+  {
+    id: 'print',
+    icon: '🖨️',
+    label: 'Imprimir',
+    info: 'Imprime el último ticket en cualquier impresora conectada a tu computadora (normal o térmica). Se habilita después de cobrar una venta.',
+  },
+  {
+    id: 'drawer',
+    icon: '💰',
+    label: 'Cajón',
+    info: 'El cajón de dinero casi siempre se abre a través de la impresora térmica (no se conecta solo). Se activará automáticamente al integrar una impresora térmica compatible con comandos ESC/POS.',
+  },
+  {
+    id: 'terminal',
+    icon: '💳',
+    label: 'Terminal',
+    info: 'El cobro con tarjeta requiere una terminal física y su SDK correspondiente (por ejemplo Stripe Terminal, ya que este sistema usa Stripe). Pendiente de integrar cuando el negocio tenga la terminal.',
+  },
+  {
+    id: 'scale',
+    icon: '⚖️',
+    label: 'Báscula',
+    info: 'Las básculas electrónicas se conectan por USB/serial y requieren programarse según la marca específica del equipo (vía WebSerial). Pendiente hasta definir el modelo que usará el negocio.',
+  },
+]
 
 export default function PosClient({
   giro,
@@ -32,6 +65,7 @@ export default function PosClient({
   const [cart, setCart] = useState<CartLine[]>([])
   const [loading, setLoading] = useState(false)
   const [lastSale, setLastSale] = useState<{ id: string; total: number } | null>(null)
+  const [lastSaleItems, setLastSaleItems] = useState<CartLine[]>([])
 
   const [invoiceLoading, setInvoiceLoading] = useState(false)
   const [invoiceResult, setInvoiceResult] = useState<{
@@ -48,6 +82,11 @@ export default function PosClient({
   const [razonSocial, setRazonSocial] = useState('')
   const [regimenFiscal, setRegimenFiscal] = useState('601')
   const [usoCfdi, setUsoCfdi] = useState('G03')
+
+  const [scanValue, setScanValue] = useState('')
+  const [scanError, setScanError] = useState<string | null>(null)
+  const [activeTool, setActiveTool] = useState<string | null>(null)
+  const scanInputRef = useRef<HTMLInputElement>(null)
 
   const handleInvoiceSubmit = async () => {
     if (!lastSale) return
@@ -81,6 +120,74 @@ export default function PosClient({
     )
   }
 
+  const handleScanSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    const code = scanValue.trim()
+    if (!code) return
+
+    const found = products.find(
+      (p) => p.sku && p.sku.toLowerCase() === code.toLowerCase()
+    )
+
+    if (found) {
+      addToCart(found)
+      setScanError(null)
+    } else {
+      setScanError('No se encontró ningún producto con ese código/SKU.')
+    }
+
+    setScanValue('')
+  }
+
+  const handlePrintTicket = () => {
+    if (!lastSale || lastSaleItems.length === 0) return
+
+    const itemsHtml = lastSaleItems
+      .map(
+        (l) => `
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+          <span>${l.quantity} x ${l.product.name}</span>
+          <span>$${(l.product.price * l.quantity).toFixed(2)}</span>
+        </div>`
+      )
+      .join('')
+
+    const ticketSubtotal = lastSaleItems.reduce((sum, l) => sum + l.product.price * l.quantity, 0)
+    const ticketTax = ticketSubtotal * 0.16
+
+    const win = window.open('', '_blank', 'width=320,height=600')
+    if (!win) return
+
+    win.document.write(`
+      <html>
+        <head>
+          <title>Ticket</title>
+          <style>
+            body { font-family: monospace; width: 280px; margin: 0 auto; padding: 12px; font-size: 12px; }
+            h2 { text-align: center; margin: 0 0 8px; }
+            hr { border: none; border-top: 1px dashed #000; margin: 8px 0; }
+            .total { display:flex; justify-content:space-between; font-weight:bold; margin-top:6px; }
+          </style>
+        </head>
+        <body>
+          <h2>${giro.nombre}</h2>
+          <div>${new Date().toLocaleString('es-MX')}</div>
+          <hr />
+          ${itemsHtml}
+          <hr />
+          <div style="display:flex;justify-content:space-between;"><span>Subtotal</span><span>$${ticketSubtotal.toFixed(2)}</span></div>
+          <div style="display:flex;justify-content:space-between;"><span>IVA (16%)</span><span>$${ticketTax.toFixed(2)}</span></div>
+          <div class="total"><span>TOTAL</span><span>$${lastSale.total.toFixed(2)}</span></div>
+          <hr />
+          <div style="text-align:center;">¡Gracias por su compra!</div>
+        </body>
+      </html>
+    `)
+    win.document.close()
+    win.focus()
+    win.print()
+  }
+
   const subtotal = cart.reduce((sum, l) => sum + l.product.price * l.quantity, 0)
   const tax = subtotal * 0.16
   const total = subtotal + tax
@@ -109,6 +216,7 @@ export default function PosClient({
       return
     }
 
+    setLastSaleItems(cart)
     setLastSale({ id: result.saleId!, total: result.total! })
     setInvoiceResult(null)
     setEsPublicoGeneral(true)
@@ -125,7 +233,7 @@ export default function PosClient({
             display: 'flex',
             alignItems: 'center',
             gap: 'var(--space-1)',
-            marginBottom: 'var(--space-3)',
+            marginBottom: 'var(--space-2)',
           }}
         >
           <a href="/" style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
@@ -135,6 +243,32 @@ export default function PosClient({
             {giro.icono} {giro.nombre}
           </h1>
         </div>
+
+        <form
+          onSubmit={handleScanSubmit}
+          style={{ display: 'flex', gap: '0.5rem', marginBottom: 'var(--space-3)' }}
+        >
+          <input
+            ref={scanInputRef}
+            value={scanValue}
+            onChange={(e) => setScanValue(e.target.value)}
+            placeholder="🔎 Escanear o escribir SKU y presionar Enter..."
+            style={{
+              flex: 1,
+              padding: '0.6rem 0.85rem',
+              borderRadius: 'var(--radius)',
+              border: '1px solid var(--border)',
+              background: 'var(--surface)',
+              color: 'var(--text)',
+              fontSize: '0.9rem',
+            }}
+          />
+        </form>
+        {scanError && (
+          <p style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '-0.5rem', marginBottom: 'var(--space-2)' }}>
+            {scanError}
+          </p>
+        )}
 
         {products.length === 0 && (
           <p style={{ color: 'var(--text-muted)' }}>Este giro todavía no tiene productos cargados.</p>
@@ -187,6 +321,61 @@ export default function PosClient({
         }}
       >
         <h2 style={{ fontSize: '1.1rem', marginBottom: 'var(--space-2)' }}>Ticket</h2>
+
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: 'var(--space-2)' }}>
+          {TOOLS.map((tool) => {
+            const disabled = tool.id === 'print' && !lastSale
+            return (
+              <button
+                key={tool.id}
+                title={tool.label}
+                disabled={disabled}
+                onClick={() => {
+                  if (tool.id === 'scan') {
+                    scanInputRef.current?.focus()
+                    setActiveTool('scan')
+                    return
+                  }
+                  if (tool.id === 'print') {
+                    handlePrintTicket()
+                    return
+                  }
+                  setActiveTool(activeTool === tool.id ? null : tool.id)
+                }}
+                style={{
+                  flex: 1,
+                  padding: '0.5rem 0',
+                  fontSize: '1.1rem',
+                  background: activeTool === tool.id ? 'var(--surface)' : 'transparent',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius)',
+                  color: disabled ? 'var(--text-muted)' : 'var(--text)',
+                  cursor: disabled ? 'not-allowed' : 'pointer',
+                  opacity: disabled ? 0.4 : 1,
+                }}
+              >
+                {tool.icon}
+              </button>
+            )
+          })}
+        </div>
+
+        {activeTool && (
+          <div
+            style={{
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderLeft: '3px solid var(--accent)',
+              borderRadius: 'var(--radius)',
+              padding: '0.6rem 0.75rem',
+              fontSize: '0.8rem',
+              color: 'var(--text-muted)',
+              marginBottom: 'var(--space-2)',
+            }}
+          >
+            {TOOLS.find((t) => t.id === activeTool)?.info}
+          </div>
+        )}
 
         {cart.length === 0 && (
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Sin productos todavía.</p>
@@ -288,7 +477,7 @@ export default function PosClient({
                     ✓ Facturado — UUID: <span className="mono">{invoiceResult.uuid}</span>
                   </p>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    {invoiceResult.pdfBase64 ? (
+                    {invoiceResult.pdfBase64 && (
                       
                         <a
                         href={'data:application/pdf;base64,' + invoiceResult.pdfBase64}
@@ -306,8 +495,8 @@ export default function PosClient({
                       >
                         Descargar PDF
                       </a>
-                    ) : null}
-                    {invoiceResult.xmlBase64 ? (
+                    )}
+                    {invoiceResult.xmlBase64 && (
                       
                         <a
                         href={'data:application/xml;base64,' + invoiceResult.xmlBase64}
@@ -325,22 +514,22 @@ export default function PosClient({
                       >
                         Descargar XML
                       </a>
-                    ) : null}
+                    )}
                   </div>
                 </div>
               )}
 
-              {invoiceResult?.error && !showInvoiceModal ? (
+              {invoiceResult?.error && !showInvoiceModal && (
                 <p style={{ color: 'var(--danger)', fontSize: '0.85rem', marginTop: '0.5rem' }}>
                   ✕ {invoiceResult.error}
                 </p>
-              ) : null}
+              )}
             </div>
           )}
         </div>
       </aside>
 
-      {showInvoiceModal && lastSale ? (
+      {showInvoiceModal && lastSale && (
         <div
           style={{
             position: 'fixed',
@@ -372,7 +561,7 @@ export default function PosClient({
               Facturar a Público en General
             </label>
 
-            {!esPublicoGeneral ? (
+            {!esPublicoGeneral && (
               <>
                 <input
                   placeholder="RFC"
@@ -401,11 +590,11 @@ export default function PosClient({
                   <option value="P01">P01 - Por definir</option>
                 </select>
               </>
-            ) : null}
+            )}
 
-            {invoiceResult?.error ? (
+            {invoiceResult?.error && (
               <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>✕ {invoiceResult.error}</p>
-            ) : null}
+            )}
 
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'var(--space-2)' }}>
               <button
@@ -441,7 +630,7 @@ export default function PosClient({
             </div>
           </div>
         </div>
-      ) : null}
+      )}
     </main>
   )
 }
