@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { descontarStockYAlertar } from '@/lib/inventory'
 
 export async function getRooms(organizationId: string, giroId: string) {
   const supabase = await createClient()
@@ -124,6 +125,10 @@ export async function checkOut(
     unit_price: room.price,
     subtotal,
   })
+
+  await descontarStockYAlertar(supabase, organizationId, [
+    { productId: reservation.room_product_id, quantity: nights },
+  ])
 
   await supabase
     .from('reservations')

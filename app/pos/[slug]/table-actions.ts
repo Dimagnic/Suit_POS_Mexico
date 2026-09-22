@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { descontarStockYAlertar } from '@/lib/inventory'
 
 export async function getOrCreateOpenOrder(tableId: string, organizationId: string, waiterId: string) {
   const supabase = await createClient()
@@ -156,6 +157,13 @@ export async function closeTableOrder(
   }))
 
   await supabase.from('sale_items').insert(saleItems)
+
+  await descontarStockYAlertar(
+    supabase,
+    organizationId,
+    items.map((i) => ({ productId: i.product_id, quantity: i.quantity }))
+  )
+
   await supabase
     .from('table_orders')
     .update({ status: 'closed', closed_at: new Date().toISOString() })

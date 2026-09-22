@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { descontarStockYAlertar } from '@/lib/inventory'
 
 export async function getAppointments(organizationId: string, giroId: string, dateISO: string) {
   const supabase = await createClient()
@@ -122,6 +123,10 @@ export async function completeAppointment(
     unit_price: service.price,
     subtotal: service.price,
   })
+
+  await descontarStockYAlertar(supabase, organizationId, [
+    { productId: appointment.service_product_id, quantity: 1 },
+  ])
 
   await supabase
     .from('appointments')

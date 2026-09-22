@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { descontarStockYAlertar } from '@/lib/inventory'
 
 export async function getPumps(organizationId: string, giroId: string) {
   const supabase = await createClient()
@@ -57,6 +58,10 @@ export async function dispenseFuel(input: {
   })
 
   if (itemError) return { error: itemError.message }
+
+  await descontarStockYAlertar(supabase, input.organizationId, [
+    { productId: input.productId, quantity: input.liters },
+  ])
 
   return { success: true, saleId: sale.id, total }
 }
