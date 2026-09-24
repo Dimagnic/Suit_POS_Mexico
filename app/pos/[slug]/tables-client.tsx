@@ -8,6 +8,12 @@ import { canManageTeam, type Role } from '@/lib/permissions'
 type Table = { id: string; name: string; status: string }
 type Product = { id: string; name: string; price: number; category: string | null }
 
+function ordenarMesas(mesas: Table[]): Table[] {
+  return [...mesas].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+  )
+}
+
 export default function TablesClient({
   tables,
   products,
@@ -31,7 +37,7 @@ export default function TablesClient({
   waiterId: string
   currentRole: Role
 }) {
-  const [tableList, setTableList] = useState<Table[]>(tables)
+  const [tableList, setTableList] = useState<Table[]>(ordenarMesas(tables))
   const [selectedTable, setSelectedTable] = useState<Table | null>(null)
   const [showManageModal, setShowManageModal] = useState(false)
 
@@ -47,7 +53,7 @@ export default function TablesClient({
 
   const refreshTables = async () => {
     const updated = await getTables(organizationId, giroId)
-    setTableList(updated as Table[])
+    setTableList(ordenarMesas(updated as Table[]))
   }
 
   const handleBack = async () => {

@@ -25,7 +25,8 @@ export async function getOrCreateOpenOrder(tableId: string, organizationId: stri
 
   if (error || !newOrder) return { error: error?.message ?? 'Error creando la orden' }
 
-  await supabase.from('restaurant_tables').update({ status: 'occupied' }).eq('id', tableId)
+  // Nota: ya NO marcamos la mesa como "occupied" aquí. Solo se marca
+  // ocupada hasta que se agrega el primer producto (ver addOrderItem).
 
   return { orderId: newOrder.id }
 }
@@ -49,7 +50,13 @@ export async function updateBottleStatus(itemId: string, status: 'sellada' | 'ab
     .eq('id', itemId)
 }
 
-export async function addOrderItem(orderId: string, productId: string, unitPrice: number, category?: string | null) {
+export async function addOrderItem(
+  orderId: string,
+  productId: string,
+  unitPrice: number,
+  tableId: string,
+  category?: string | null
+) {
   const supabase = await createClient()
 
   if (category === 'botella') {
@@ -60,29 +67,31 @@ export async function addOrderItem(orderId: string, productId: string, unitPrice
       unit_price: unitPrice,
       bottle_status: 'sellada',
     })
-    return
-  }
-
-  const { data: existing } = await supabase
-    .from('table_order_items')
-    .select('id, quantity')
-    .eq('table_order_id', orderId)
-    .eq('product_id', productId)
-    .maybeSingle()
-
-  if (existing) {
-    await supabase
-      .from('table_order_items')
-      .update({ quantity: existing.quantity + 1 })
-      .eq('id', existing.id)
   } else {
-    await supabase.from('table_order_items').insert({
-      table_order_id: orderId,
-      product_id: productId,
-      quantity: 1,
-      unit_price: unitPrice,
-    })
+    const { data: existing } = await supabase
+      .from('table_order_items')
+      .select('id, quantity')
+      .eq('table_order_id', orderId)
+      .eq('product_id', productId)
+      .maybeSingle()
+
+    if (existing) {
+      await supabase
+        .from('table_order_items')
+        .update({ quantity: existing.quantity + 1 })
+        .eq('id', existing.id)
+    } else {
+      await supabase.from('table_order_items').insert({
+        table_order_id: orderId,
+        product_id: productId,
+        quantity: 1,
+        unit_price: unitPrice,
+      })
+    }
   }
+
+  // Ahora sí: al agregar el primer (o cualquier) producto, la mesa pasa a ocupada.
+  await supabase.from('restaurant_tables').update({ status: 'occupied' }).eq('id', tableId)
 }
 
 export async function changeOrderItemQty(itemId: string, delta: number) {

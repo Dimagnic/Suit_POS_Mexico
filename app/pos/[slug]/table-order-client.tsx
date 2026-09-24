@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   getOrCreateOpenOrder,
   getOrderItems,
@@ -51,6 +51,7 @@ export default function TableOrderClient({
   const [closedResult, setClosedResult] = useState<{ saleId: string; total: number } | null>(null)
   const [invoiceLoading, setInvoiceLoading] = useState(false)
   const [invoiceResult, setInvoiceResult] = useState<{ success?: boolean; error?: string; uuid?: string } | null>(null)
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
 
   useEffect(() => {
     const init = async () => {
@@ -73,7 +74,7 @@ export default function TableOrderClient({
 
   const handleAdd = async (product: Product) => {
     if (!orderId) return
-    await addOrderItem(orderId, product.id, product.price, product.category)
+    await addOrderItem(orderId, product.id, product.price, table.id, product.category)
     await refreshItems()
   }
 
@@ -86,6 +87,32 @@ export default function TableOrderClient({
     await changeOrderItemQty(itemId, delta)
     await refreshItems()
   }
+
+  // Categorías únicas, ordenadas alfabéticamente
+  const categorias = useMemo(() => {
+    const set = new Set(products.map((p) => p.category ?? 'Otros'))
+    return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+  }, [products])
+
+  // Productos ya filtrados por categoría seleccionada (o todos)
+  const productosFiltrados = useMemo(() => {
+    const base = selectedCategory
+      ? products.filter((p) => (p.category ?? 'Otros') === selectedCategory)
+      : products
+    return [...base].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+  }, [products, selectedCategory])
+
+  // Cuando no hay filtro activo, agrupamos por categoría para mostrar encabezados
+  const productosAgrupados = useMemo(() => {
+    if (selectedCategory) return null
+    const grupos = new Map<string, Product[]>()
+    for (const cat of categorias) grupos.set(cat, [])
+    for (const p of productosFiltrados) {
+      const cat = p.category ?? 'Otros'
+      grupos.get(cat)?.push(p)
+    }
+    return grupos
+  }, [productosFiltrados, categorias, selectedCategory])
 
   const subtotal = items.reduce((sum, i) => sum + i.unit_price * i.quantity, 0)
   const tax = subtotal * 0.16
@@ -182,38 +209,85 @@ export default function TableOrderClient({
   return (
     <main style={{ display: 'flex', minHeight: '100vh' }}>
       <section style={{ flex: '1 1 65%', padding: 'var(--space-3)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', marginBottom: 'var(--space-3)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', marginBottom: 'var(--space-2)' }}>
           <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.9rem' }}>
             ← Mesas
           </button>
           <h1 style={{ fontSize: '1.25rem' }}>{giroIcono ?? '🍽️'} {table.name}</h1>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 'var(--space-2)' }}>
-          {products.map((p) => (
+        {/* Filtro de categorías */}
+        <div
+          style={{
+            display: 'flex',
+            gap: '0.4rem',
+            marginBottom: 'var(--space-3)',
+            overflowX: 'auto',
+            paddingBottom: '0.4rem',
+          }}
+        >
+          <button
+            onClick={() => setSelectedCategory(null)}
+            style={{
+              flexShrink: 0,
+              padding: '0.4rem 0.8rem',
+              borderRadius: '999px',
+              border: '1px solid var(--border)',
+              cursor: 'pointer',
+              fontSize: '0.8rem',
+              whiteSpace: 'nowrap',
+              background: selectedCategory === null ? 'var(--accent)' : 'transparent',
+              color: selectedCategory === null ? '#1a1206' : 'var(--text)',
+            }}
+          >
+            Todas
+          </button>
+          {categorias.map((cat) => (
             <button
-              key={p.id}
-              onClick={() => handleAdd(p)}
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
               style={{
-                textAlign: 'left',
-                background: 'var(--surface)',
+                flexShrink: 0,
+                padding: '0.4rem 0.8rem',
+                borderRadius: '999px',
                 border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
-                padding: 'var(--space-2)',
-                color: 'var(--text)',
                 cursor: 'pointer',
+                fontSize: '0.8rem',
+                whiteSpace: 'nowrap',
+                background: selectedCategory === cat ? 'var(--accent)' : 'transparent',
+                color: selectedCategory === cat ? '#1a1206' : 'var(--text)',
               }}
             >
-              <strong style={{ display: 'block', marginBottom: '0.25rem' }}>{p.name}</strong>
-              <p style={{ margin: '0 0 0.5rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                {p.category ?? 'General'}
-              </p>
-              <p className="mono" style={{ fontSize: '1.1rem', margin: 0, color: 'var(--accent)' }}>
-                ${p.price.toFixed(2)}
-              </p>
+              {cat}
             </button>
           ))}
         </div>
+
+        {/* Sin filtro: agrupado por categoría con encabezados. Con filtro: grid simple */}
+        {selectedCategory === null && productosAgrupados
+          ? categorias.map((cat) => {
+              const productosDeCategoria = productosAgrupados.get(cat) ?? []
+              if (productosDeCategoria.length === 0) return null
+              return (
+                <div key={cat} style={{ marginBottom: 'var(--space-3)' }}>
+                  <h3 style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: 'var(--space-1)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                    {cat}
+                  </h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 'var(--space-2)' }}>
+                    {productosDeCategoria.map((p) => (
+                      <ProductButton key={p.id} product={p} onClick={() => handleAdd(p)} />
+                    ))}
+                  </div>
+                </div>
+              )
+            })
+          : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 'var(--space-2)' }}>
+              {productosFiltrados.map((p) => (
+                <ProductButton key={p.id} product={p} onClick={() => handleAdd(p)} />
+              ))}
+            </div>
+          )}
       </section>
 
       <aside
@@ -316,6 +390,31 @@ export default function TableOrderClient({
         </div>
       </aside>
     </main>
+  )
+}
+
+function ProductButton({ product, onClick }: { product: Product; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        textAlign: 'left',
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius)',
+        padding: 'var(--space-2)',
+        color: 'var(--text)',
+        cursor: 'pointer',
+      }}
+    >
+      <strong style={{ display: 'block', marginBottom: '0.25rem' }}>{product.name}</strong>
+      <p style={{ margin: '0 0 0.5rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+        {product.category ?? 'General'}
+      </p>
+      <p className="mono" style={{ fontSize: '1.1rem', margin: 0, color: 'var(--accent)' }}>
+        ${product.price.toFixed(2)}
+      </p>
+    </button>
   )
 }
 
