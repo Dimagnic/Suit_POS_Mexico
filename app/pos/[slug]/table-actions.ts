@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { descontarStockYAlertar } from '@/lib/inventory'
+import { canManageTeam, type Role } from '@/lib/permissions'
 
 export async function getOrCreateOpenOrder(tableId: string, organizationId: string, waiterId: string) {
   const supabase = await createClient()
@@ -51,8 +52,6 @@ export async function updateBottleStatus(itemId: string, status: 'sellada' | 'ab
 export async function addOrderItem(orderId: string, productId: string, unitPrice: number, category?: string | null) {
   const supabase = await createClient()
 
-  // Las botellas se rastrean una por una (cada una con su propio estado),
-  // nunca se agrupan en una sola línea con cantidad > 1.
   if (category === 'botella') {
     await supabase.from('table_order_items').insert({
       table_order_id: orderId,
@@ -186,8 +185,6 @@ export async function getTables(organizationId: string, giroId: string) {
   return data ?? []
 }
 
-import { canManageTeam, type Role } from '@/lib/permissions'
-
 async function getCurrentUser() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -200,7 +197,7 @@ async function getCurrentUser() {
   return appUser
 }
 
-export async function createTable(giroId: string, name: string) {
+export async function createTable(giroId: string, branchId: string, name: string) {
   const supabase = await createClient()
   const current = await getCurrentUser()
   if (!current) return { error: 'No autenticado' }
@@ -219,6 +216,7 @@ export async function createTable(giroId: string, name: string) {
 
   const { error } = await supabase.from('restaurant_tables').insert({
     organization_id: current.organization_id,
+    branch_id: branchId,
     giro_id: giroId,
     name: name.trim(),
     status: 'available',
@@ -228,7 +226,7 @@ export async function createTable(giroId: string, name: string) {
   return { success: true }
 }
 
-export async function createMultipleTables(giroId: string, cantidad: number, prefijo: string) {
+export async function createMultipleTables(giroId: string, branchId: string, cantidad: number, prefijo: string) {
   const supabase = await createClient()
   const current = await getCurrentUser()
   if (!current) return { error: 'No autenticado' }
@@ -243,12 +241,13 @@ export async function createMultipleTables(giroId: string, cantidad: number, pre
 
   const nombresExistentes = new Set((existentes ?? []).map((t) => t.name.trim().toLowerCase()))
 
-  const nuevas: { organization_id: string; giro_id: string; name: string; status: string }[] = []
+  const nuevas: { organization_id: string; branch_id: string; giro_id: string; name: string; status: string }[] = []
   for (let i = 1; i <= cantidad; i++) {
     const nombre = `${prefijo.trim() || 'Mesa'} ${i}`
     if (!nombresExistentes.has(nombre.toLowerCase())) {
       nuevas.push({
         organization_id: current.organization_id,
+        branch_id: branchId,
         giro_id: giroId,
         name: nombre,
         status: 'available',

@@ -58,7 +58,7 @@ export default function TablesClient({
   const handleAddOne = async () => {
     setActionLoading(true)
     setActionError(null)
-    const result = await createTable(giroId, nuevoNombre)
+    const result = await createTable(giroId, branchId, nuevoNombre)
     setActionLoading(false)
     if (result.error) {
       setActionError(result.error)
@@ -71,7 +71,7 @@ export default function TablesClient({
   const handleAddBulk = async () => {
     setActionLoading(true)
     setActionError(null)
-    const result = await createMultipleTables(giroId, cantidad, prefijo)
+    const result = await createMultipleTables(giroId, branchId, cantidad, prefijo)
     setActionLoading(false)
     if (result.error) {
       setActionError(result.error)
