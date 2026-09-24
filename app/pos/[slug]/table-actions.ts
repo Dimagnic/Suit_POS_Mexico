@@ -185,3 +185,133 @@ export async function getTables(organizationId: string, giroId: string) {
     .order('name')
   return data ?? []
 }
+
+import { canManageTeam, type Role } from '@/lib/permissions'
+
+async function getCurrentUser() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+  const { data: appUser } = await supabase
+    .from('app_users')
+    .select('role, organization_id')
+    .eq('id', user.id)
+    .single()
+  return appUser
+}
+
+export async function createTable(giroId: string, name: string) {
+  const supabase = await createClient()
+  const current = await getCurrentUser()
+  if (!current) return { error: 'No autenticado' }
+  if (!canManageTeam(current.role as Role)) return { error: 'No tienes permiso para gestionar mesas.' }
+  if (!name.trim()) return { error: 'El nombre es obligatorio.' }
+
+  const { data: existing } = await supabase
+    .from('restaurant_tables')
+    .select('id')
+    .eq('organization_id', current.organization_id)
+    .eq('giro_id', giroId)
+    .ilike('name', name.trim())
+    .maybeSingle()
+
+  if (existing) return { error: `Ya existe una mesa llamada "${name.trim()}".` }
+
+  const { error } = await supabase.from('restaurant_tables').insert({
+    organization_id: current.organization_id,
+    giro_id: giroId,
+    name: name.trim(),
+    status: 'available',
+  })
+
+  if (error) return { error: error.message }
+  return { success: true }
+}
+
+export async function createMultipleTables(giroId: string, cantidad: number, prefijo: string) {
+  const supabase = await createClient()
+  const current = await getCurrentUser()
+  if (!current) return { error: 'No autenticado' }
+  if (!canManageTeam(current.role as Role)) return { error: 'No tienes permiso para gestionar mesas.' }
+  if (cantidad < 1 || cantidad > 100) return { error: 'La cantidad debe ser entre 1 y 100.' }
+
+  const { data: existentes } = await supabase
+    .from('restaurant_tables')
+    .select('name')
+    .eq('organization_id', current.organization_id)
+    .eq('giro_id', giroId)
+
+  const nombresExistentes = new Set((existentes ?? []).map((t) => t.name.trim().toLowerCase()))
+
+  const nuevas: { organization_id: string; giro_id: string; name: string; status: string }[] = []
+  for (let i = 1; i <= cantidad; i++) {
+    const nombre = `${prefijo.trim() || 'Mesa'} ${i}`
+    if (!nombresExistentes.has(nombre.toLowerCase())) {
+      nuevas.push({
+        organization_id: current.organization_id,
+        giro_id: giroId,
+        name: nombre,
+        status: 'available',
+      })
+    }
+  }
+
+  if (nuevas.length === 0) {
+    return { error: 'Todas esas mesas ya existen.' }
+  }
+
+  const { error } = await supabase.from('restaurant_tables').insert(nuevas)
+  if (error) return { error: error.message }
+  return { success: true, creadas: nuevas.length }
+}
+
+export async function renameTable(tableId: string, newName: string) {
+  const supabase = await createClient()
+  const current = await getCurrentUser()
+  if (!current) return { error: 'No autenticado' }
+  if (!canManageTeam(current.role as Role)) return { error: 'No tienes permiso para gestionar mesas.' }
+  if (!newName.trim()) return { error: 'El nombre es obligatorio.' }
+
+  const { data: target } = await supabase
+    .from('restaurant_tables')
+    .select('organization_id')
+    .eq('id', tableId)
+    .single()
+
+  if (!target || target.organization_id !== current.organization_id) {
+    return { error: 'Esa mesa no pertenece a tu organización.' }
+  }
+
+  const { error } = await supabase
+    .from('restaurant_tables')
+    .update({ name: newName.trim() })
+    .eq('id', tableId)
+
+  if (error) return { error: error.message }
+  return { success: true }
+}
+
+export async function deleteTable(tableId: string) {
+  const supabase = await createClient()
+  const current = await getCurrentUser()
+  if (!current) return { error: 'No autenticado' }
+  if (!canManageTeam(current.role as Role)) return { error: 'No tienes permiso para gestionar mesas.' }
+
+  const { data: target } = await supabase
+    .from('restaurant_tables')
+    .select('organization_id, status')
+    .eq('id', tableId)
+    .single()
+
+  if (!target || target.organization_id !== current.organization_id) {
+    return { error: 'Esa mesa no pertenece a tu organización.' }
+  }
+
+  if (target.status === 'occupied') {
+    return { error: 'No puedes eliminar una mesa ocupada. Cierra su cuenta primero.' }
+  }
+
+  const { error } = await supabase.from('restaurant_tables').delete().eq('id', tableId)
+  if (error) return { error: error.message }
+  return { success: true }
+}

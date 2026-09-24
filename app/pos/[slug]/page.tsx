@@ -69,7 +69,7 @@ export default async function PosPage({ params }: { params: Promise<{ slug: stri
       .eq('giro_id', giro.id)
       .order('name')
 
-    return (
+        return (
       <TablesClient
         tables={tables ?? []}
         products={products ?? []}
@@ -80,6 +80,7 @@ export default async function PosPage({ params }: { params: Promise<{ slug: stri
         giroNombre={giro.nombre}
         giroIcono={giro.icono}
         waiterId={user.id}
+        currentRole={appUser.role as Role}
       />
     )
   }
