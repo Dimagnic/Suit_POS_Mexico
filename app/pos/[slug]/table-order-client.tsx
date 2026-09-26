@@ -204,8 +204,8 @@ export default function TableOrderClient({
   }
 
   return (
-    <main style={{ display: 'flex', minHeight: '100vh' }}>
-      <section style={{ flex: '1 1 65%', padding: 'var(--space-3)' }}>
+    <main style={{ display: 'flex', minHeight: '100vh', overflow: 'hidden' }}>
+      <section style={{ flex: '1 1 65%', minWidth: 0, padding: 'var(--space-3)', overflowY: 'auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', marginBottom: 'var(--space-2)' }}>
           <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.9rem' }}>
             ← Mesas
@@ -220,6 +220,8 @@ export default function TableOrderClient({
             marginBottom: 'var(--space-3)',
             overflowX: 'auto',
             paddingBottom: '0.4rem',
+            width: '100%',
+            minWidth: 0,
           }}
         >
           <button
@@ -288,11 +290,15 @@ export default function TableOrderClient({
       <aside
         style={{
           flex: '1 1 35%',
+          minWidth: '320px',
+          maxWidth: '420px',
           background: 'var(--surface-2)',
           padding: 'var(--space-3)',
           borderLeft: '1px solid var(--border)',
           display: 'flex',
           flexDirection: 'column',
+          overflowY: 'auto',
+          maxHeight: '100vh',
         }}
       >
         <h2 style={{ fontSize: '1.1rem', marginBottom: 'var(--space-2)' }}>Comanda — {table.name}</h2>
