@@ -25,9 +25,6 @@ export async function getOrCreateOpenOrder(tableId: string, organizationId: stri
 
   if (error || !newOrder) return { error: error?.message ?? 'Error creando la orden' }
 
-  // Nota: ya NO marcamos la mesa como "occupied" aquí. Solo se marca
-  // ocupada hasta que se agrega el primer producto (ver addOrderItem).
-
   return { orderId: newOrder.id }
 }
 
@@ -90,7 +87,6 @@ export async function addOrderItem(
     }
   }
 
-  // Ahora sí: al agregar el primer (o cualquier) producto, la mesa pasa a ocupada.
   await supabase.from('restaurant_tables').update({ status: 'occupied' }).eq('id', tableId)
 }
 

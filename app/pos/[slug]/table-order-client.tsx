@@ -88,13 +88,11 @@ export default function TableOrderClient({
     await refreshItems()
   }
 
-  // Categorías únicas, ordenadas alfabéticamente
   const categorias = useMemo(() => {
     const set = new Set(products.map((p) => p.category ?? 'Otros'))
     return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
   }, [products])
 
-  // Productos ya filtrados por categoría seleccionada (o todos)
   const productosFiltrados = useMemo(() => {
     const base = selectedCategory
       ? products.filter((p) => (p.category ?? 'Otros') === selectedCategory)
@@ -102,7 +100,6 @@ export default function TableOrderClient({
     return [...base].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
   }, [products, selectedCategory])
 
-  // Cuando no hay filtro activo, agrupamos por categoría para mostrar encabezados
   const productosAgrupados = useMemo(() => {
     if (selectedCategory) return null
     const grupos = new Map<string, Product[]>()
@@ -216,7 +213,6 @@ export default function TableOrderClient({
           <h1 style={{ fontSize: '1.25rem' }}>{giroIcono ?? '🍽️'} {table.name}</h1>
         </div>
 
-        {/* Filtro de categorías */}
         <div
           style={{
             display: 'flex',
@@ -263,7 +259,6 @@ export default function TableOrderClient({
           ))}
         </div>
 
-        {/* Sin filtro: agrupado por categoría con encabezados. Con filtro: grid simple */}
         {selectedCategory === null && productosAgrupados
           ? categorias.map((cat) => {
               const productosDeCategoria = productosAgrupados.get(cat) ?? []
