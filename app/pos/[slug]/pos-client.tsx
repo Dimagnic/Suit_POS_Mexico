@@ -236,9 +236,7 @@ export default function PosClient({
             marginBottom: 'var(--space-2)',
           }}
         >
-          <a href="/" style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            ← Volver
-          </a>
+          <a href="/" style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>← Volver</a>
           <h1 style={{ fontSize: '1.25rem' }}>
             {giro.icono} {giro.nombre}
           </h1>
@@ -400,15 +398,11 @@ export default function PosClient({
                 </small>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <button onClick={() => changeQty(l.product.id, -1)} style={qtyBtnStyle}>
-                  −
-                </button>
+                <button onClick={() => changeQty(l.product.id, -1)} style={qtyBtnStyle}>−</button>
                 <span className="mono" style={{ minWidth: '1.5rem', textAlign: 'center' }}>
                   {l.quantity}
                 </span>
-                <button onClick={() => changeQty(l.product.id, 1)} style={qtyBtnStyle}>
-                  +
-                </button>
+                <button onClick={() => changeQty(l.product.id, 1)} style={qtyBtnStyle}>+</button>
               </div>
             </div>
           ))}
@@ -478,42 +472,10 @@ export default function PosClient({
                   </p>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     {invoiceResult.pdfBase64 && (
-                      
-                        <a
-                        href={'data:application/pdf;base64,' + invoiceResult.pdfBase64}
-                        download={'factura-' + invoiceResult.uuid + '.pdf'}
-                        style={{
-                          flex: 1,
-                          textAlign: 'center',
-                          padding: '0.5rem',
-                          border: '1px solid var(--accent)',
-                          borderRadius: 'var(--radius)',
-                          color: 'var(--accent)',
-                          fontSize: '0.8rem',
-                          textDecoration: 'none',
-                        }}
-                      >
-                        Descargar PDF
-                      </a>
+                      <a href={'data:application/pdf;base64,' + invoiceResult.pdfBase64} download={'factura-' + invoiceResult.uuid + '.pdf'} style={{ flex: 1, textAlign: 'center', padding: '0.5rem', border: '1px solid var(--accent)', borderRadius: 'var(--radius)', color: 'var(--accent)', fontSize: '0.8rem', textDecoration: 'none' }}>Descargar PDF</a>
                     )}
                     {invoiceResult.xmlBase64 && (
-                      
-                        <a
-                        href={'data:application/xml;base64,' + invoiceResult.xmlBase64}
-                        download={'factura-' + invoiceResult.uuid + '.xml'}
-                        style={{
-                          flex: 1,
-                          textAlign: 'center',
-                          padding: '0.5rem',
-                          border: '1px solid var(--border)',
-                          borderRadius: 'var(--radius)',
-                          color: 'var(--text)',
-                          fontSize: '0.8rem',
-                          textDecoration: 'none',
-                        }}
-                      >
-                        Descargar XML
-                      </a>
+                      <a href={'data:application/xml;base64,' + invoiceResult.xmlBase64} download={'factura-' + invoiceResult.uuid + '.xml'} style={{ flex: 1, textAlign: 'center', padding: '0.5rem', border: '1px solid var(--border)', borderRadius: 'var(--radius)', color: 'var(--text)', fontSize: '0.8rem', textDecoration: 'none' }}>Descargar XML</a>
                     )}
                   </div>
                 </div>

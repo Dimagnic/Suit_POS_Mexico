@@ -1,6 +1,6 @@
-'use client'
+﻿'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import {
   getOrCreateOpenOrder,
   getOrderItems,
@@ -12,7 +12,7 @@ import {
 import { generarFactura } from './invoice-actions'
 
 type Table = { id: string; name: string; status: string }
-type Product = { id: string; name: string; price: number; category: string | null }
+type Product = { id: string; sku?: string | null; name: string; price: number; category: string | null }
 type OrderItem = {
   id: string
   product_id: string
@@ -22,6 +22,39 @@ type OrderItem = {
   ml_restante: number | null
   products: { name: string; category: string | null; ml_total: number | null }
 }
+
+const TOOLS = [
+  {
+    id: 'scan',
+    icon: '🔎',
+    label: 'Escáner',
+    info: 'Ya funciona: cualquier lector de código de barras USB actúa como teclado. Haz clic aquí para enfocar el campo de escaneo y pasa el producto.',
+  },
+  {
+    id: 'print',
+    icon: '🖨️',
+    label: 'Imprimir',
+    info: 'Imprime el último ticket en cualquier impresora conectada a tu computadora (normal o térmica). Se habilita después de cobrar la mesa.',
+  },
+  {
+    id: 'drawer',
+    icon: '💰',
+    label: 'Cajón',
+    info: 'El cajón de dinero casi siempre se abre a través de la impresora térmica (no se conecta solo). Se activará automáticamente al integrar una impresora térmica compatible con comandos ESC/POS.',
+  },
+  {
+    id: 'terminal',
+    icon: '💳',
+    label: 'Terminal',
+    info: 'El cobro con tarjeta requiere una terminal física y su SDK correspondiente (por ejemplo Stripe Terminal, ya que este sistema usa Stripe). Pendiente de integrar cuando el negocio tenga la terminal.',
+  },
+  {
+    id: 'scale',
+    icon: '⚖️',
+    label: 'Báscula',
+    info: 'Las básculas electrónicas se conectan por USB/serial y requieren programarse según la marca específica del equipo (vía WebSerial). Pendiente hasta definir el modelo que usará el negocio.',
+  },
+]
 
 export default function TableOrderClient({
   table,
@@ -50,8 +83,26 @@ export default function TableOrderClient({
   const [closing, setClosing] = useState(false)
   const [closedResult, setClosedResult] = useState<{ saleId: string; total: number } | null>(null)
   const [invoiceLoading, setInvoiceLoading] = useState(false)
-  const [invoiceResult, setInvoiceResult] = useState<{ success?: boolean; error?: string; uuid?: string } | null>(null)
+  const [invoiceResult, setInvoiceResult] = useState<{
+    success?: boolean
+    error?: string
+    uuid?: string
+    xmlBase64?: string | null
+    pdfBase64?: string | null
+  } | null>(null)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false)
+  const [esPublicoGeneral, setEsPublicoGeneral] = useState(true)
+  const [rfc, setRfc] = useState('')
+  const [razonSocial, setRazonSocial] = useState('')
+  const [regimenFiscal, setRegimenFiscal] = useState('601')
+  const [usoCfdi, setUsoCfdi] = useState('G03')
+
+  const [scanValue, setScanValue] = useState('')
+  const [scanError, setScanError] = useState<string | null>(null)
+  const [activeTool, setActiveTool] = useState<string | null>(null)
+  const scanInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const init = async () => {
@@ -76,6 +127,74 @@ export default function TableOrderClient({
     if (!orderId) return
     await addOrderItem(orderId, product.id, product.price, table.id, product.category)
     await refreshItems()
+  }
+
+  const handleScanSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    const code = scanValue.trim()
+    if (!code) return
+
+    const found = products.find(
+      (p) => p.sku && p.sku.toLowerCase() === code.toLowerCase()
+    )
+
+    if (found) {
+      handleAdd(found)
+      setScanError(null)
+    } else {
+      setScanError('No se encontró ningún producto con ese código/SKU.')
+    }
+
+    setScanValue('')
+  }
+
+  const handlePrintTicket = () => {
+    if (!closedResult || items.length === 0) return
+
+    const itemsHtml = items
+      .map(
+        (i) => `
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+          <span>${i.quantity} x ${i.products?.name ?? ''}</span>
+          <span>$${(i.unit_price * i.quantity).toFixed(2)}</span>
+        </div>`
+      )
+      .join('')
+
+    const ticketSubtotal = items.reduce((sum, i) => sum + i.unit_price * i.quantity, 0)
+    const ticketTax = ticketSubtotal * 0.16
+
+    const win = window.open('', '_blank', 'width=320,height=600')
+    if (!win) return
+
+    win.document.write(`
+      <html>
+        <head>
+          <title>Ticket</title>
+          <style>
+            body { font-family: monospace; width: 280px; margin: 0 auto; padding: 12px; font-size: 12px; }
+            h2 { text-align: center; margin: 0 0 8px; }
+            hr { border: none; border-top: 1px dashed #000; margin: 8px 0; }
+            .total { display:flex; justify-content:space-between; font-weight:bold; margin-top:6px; }
+          </style>
+        </head>
+        <body>
+          <h2>${table.name}</h2>
+          <div>${new Date().toLocaleString('es-MX')}</div>
+          <hr />
+          ${itemsHtml}
+          <hr />
+          <div style="display:flex;justify-content:space-between;"><span>Subtotal</span><span>$${ticketSubtotal.toFixed(2)}</span></div>
+          <div style="display:flex;justify-content:space-between;"><span>IVA (16%)</span><span>$${ticketTax.toFixed(2)}</span></div>
+          <div class="total"><span>TOTAL</span><span>$${closedResult.total.toFixed(2)}</span></div>
+          <hr />
+          <div style="text-align:center;">¡Gracias por su compra!</div>
+        </body>
+      </html>
+    `)
+    win.document.close()
+    win.focus()
+    win.print()
   }
 
   const handleBottleStatus = async (itemId: string, status: 'sellada' | 'abierta' | 'vacia') => {
@@ -129,12 +248,16 @@ export default function TableOrderClient({
     setClosedResult({ saleId: result.saleId!, total: result.total! })
   }
 
-  const handleInvoice = async () => {
+  const handleInvoiceSubmit = async () => {
     if (!closedResult) return
     setInvoiceLoading(true)
-    const result = await generarFactura(closedResult.saleId)
+    const result = await generarFactura(
+      closedResult.saleId,
+      esPublicoGeneral ? undefined : { rfc, razonSocial, regimenFiscal, usoCfdi }
+    )
     setInvoiceLoading(false)
     setInvoiceResult(result)
+    if (!result.error) setShowInvoiceModal(false)
   }
 
   if (loading) {
@@ -157,9 +280,24 @@ export default function TableOrderClient({
           ✓ {table.name} cobrada — Total: ${closedResult.total.toFixed(2)}
         </p>
 
-        {!invoiceResult && (
+        <button
+          onClick={handlePrintTicket}
+          style={{
+            padding: '0.5rem 1.2rem',
+            background: 'transparent',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            color: 'var(--text)',
+            cursor: 'pointer',
+            fontSize: '0.85rem',
+          }}
+        >
+          🖨️ Imprimir ticket
+        </button>
+
+        {!invoiceResult?.success && (
           <button
-            onClick={handleInvoice}
+            onClick={() => setShowInvoiceModal(true)}
             disabled={invoiceLoading}
             style={{
               padding: '0.6rem 1.5rem',
@@ -176,12 +314,50 @@ export default function TableOrderClient({
         )}
 
         {invoiceResult?.success && (
-          <p style={{ color: 'var(--success)', fontSize: '0.85rem' }}>
-            ✓ Facturado — UUID: <span className="mono">{invoiceResult.uuid}</span>
-          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+            <p style={{ color: 'var(--success)', fontSize: '0.85rem', margin: 0 }}>
+              ✓ Facturado — UUID: <span className="mono">{invoiceResult.uuid}</span>
+            </p>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              {invoiceResult.pdfBase64 && (
+                
+                  <a
+                  href={'data:application/pdf;base64,' + invoiceResult.pdfBase64}
+                  download={'factura-' + invoiceResult.uuid + '.pdf'}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    border: '1px solid var(--accent)',
+                    borderRadius: 'var(--radius)',
+                    color: 'var(--accent)',
+                    fontSize: '0.8rem',
+                    textDecoration: 'none',
+                  }}
+                >
+                  Descargar PDF
+                </a>
+              )}
+              {invoiceResult.xmlBase64 && (
+                
+                  <a
+                  href={'data:application/xml;base64,' + invoiceResult.xmlBase64}
+                  download={'factura-' + invoiceResult.uuid + '.xml'}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius)',
+                    color: 'var(--text)',
+                    fontSize: '0.8rem',
+                    textDecoration: 'none',
+                  }}
+                >
+                  Descargar XML
+                </a>
+              )}
+            </div>
+          </div>
         )}
 
-        {invoiceResult?.error && (
+        {invoiceResult?.error && !showInvoiceModal && (
           <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>✕ {invoiceResult.error}</p>
         )}
 
@@ -199,6 +375,109 @@ export default function TableOrderClient({
         >
           Volver a mesas
         </button>
+
+        {showInvoiceModal && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.6)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 50,
+            }}
+          >
+            <div
+              style={{
+                background: 'var(--surface)',
+                borderRadius: 'var(--radius)',
+                padding: 'var(--space-3)',
+                width: '90%',
+                maxWidth: '420px',
+              }}
+            >
+              <h3 style={{ marginTop: 0 }}>Datos de facturación</h3>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: 'var(--space-2)' }}>
+                <input
+                  type="checkbox"
+                  checked={esPublicoGeneral}
+                  onChange={(e) => setEsPublicoGeneral(e.target.checked)}
+                />
+                Facturar a Público en General
+              </label>
+
+              {!esPublicoGeneral && (
+                <>
+                  <input
+                    placeholder="RFC"
+                    value={rfc}
+                    onChange={(e) => setRfc(e.target.value.toUpperCase())}
+                    style={inputStyle}
+                  />
+                  <input
+                    placeholder="Razón social"
+                    value={razonSocial}
+                    onChange={(e) => setRazonSocial(e.target.value)}
+                    style={inputStyle}
+                  />
+                  <select value={regimenFiscal} onChange={(e) => setRegimenFiscal(e.target.value)} style={inputStyle}>
+                    <option value="601">601 - General de Ley Personas Morales</option>
+                    <option value="603">603 - Personas Morales con Fines no Lucrativos</option>
+                    <option value="605">605 - Sueldos y Salarios</option>
+                    <option value="612">612 - Personas Físicas con Actividades Empresariales</option>
+                    <option value="621">621 - Incorporación Fiscal</option>
+                    <option value="626">626 - Régimen Simplificado de Confianza</option>
+                  </select>
+                  <select value={usoCfdi} onChange={(e) => setUsoCfdi(e.target.value)} style={inputStyle}>
+                    <option value="G01">G01 - Adquisición de mercancías</option>
+                    <option value="G03">G03 - Gastos en general</option>
+                    <option value="I08">I08 - Otra maquinaria y equipo</option>
+                    <option value="P01">P01 - Por definir</option>
+                  </select>
+                </>
+              )}
+
+              {invoiceResult?.error && (
+                <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>✕ {invoiceResult.error}</p>
+              )}
+
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'var(--space-2)' }}>
+                <button
+                  onClick={() => setShowInvoiceModal(false)}
+                  style={{
+                    flex: 1,
+                    padding: '0.6rem',
+                    background: 'transparent',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius)',
+                    color: 'var(--text)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleInvoiceSubmit}
+                  disabled={invoiceLoading}
+                  style={{
+                    flex: 1,
+                    padding: '0.6rem',
+                    background: 'var(--accent)',
+                    color: '#1a1206',
+                    border: 'none',
+                    borderRadius: 'var(--radius)',
+                    fontWeight: 600,
+                    cursor: invoiceLoading ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {invoiceLoading ? 'Generando...' : 'Timbrar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     )
   }
@@ -212,6 +491,32 @@ export default function TableOrderClient({
           </button>
           <h1 style={{ fontSize: '1.25rem' }}>{giroIcono ?? '🍽️'} {table.name}</h1>
         </div>
+
+        <form
+          onSubmit={handleScanSubmit}
+          style={{ display: 'flex', gap: '0.5rem', marginBottom: 'var(--space-2)' }}
+        >
+          <input
+            ref={scanInputRef}
+            value={scanValue}
+            onChange={(e) => setScanValue(e.target.value)}
+            placeholder="🔎 Escanear o escribir SKU y presionar Enter..."
+            style={{
+              flex: 1,
+              padding: '0.6rem 0.85rem',
+              borderRadius: 'var(--radius)',
+              border: '1px solid var(--border)',
+              background: 'var(--surface)',
+              color: 'var(--text)',
+              fontSize: '0.9rem',
+            }}
+          />
+        </form>
+        {scanError && (
+          <p style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '-0.5rem', marginBottom: 'var(--space-2)' }}>
+            {scanError}
+          </p>
+        )}
 
         <div
           style={{
@@ -302,6 +607,59 @@ export default function TableOrderClient({
         }}
       >
         <h2 style={{ fontSize: '1.1rem', marginBottom: 'var(--space-2)' }}>Comanda — {table.name}</h2>
+
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: 'var(--space-2)' }}>
+          {TOOLS.map((tool) => {
+            const disabled = tool.id === 'print'
+            return (
+              <button
+                key={tool.id}
+                title={tool.label}
+                disabled={disabled}
+                onClick={() => {
+                  if (tool.id === 'scan') {
+                    scanInputRef.current?.focus()
+                    setActiveTool('scan')
+                    return
+                  }
+                  setActiveTool(activeTool === tool.id ? null : tool.id)
+                }}
+                style={{
+                  flex: 1,
+                  padding: '0.5rem 0',
+                  fontSize: '1.1rem',
+                  background: activeTool === tool.id ? 'var(--surface)' : 'transparent',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius)',
+                  color: disabled ? 'var(--text-muted)' : 'var(--text)',
+                  cursor: disabled ? 'not-allowed' : 'pointer',
+                  opacity: disabled ? 0.4 : 1,
+                }}
+              >
+                {tool.icon}
+              </button>
+            )
+          })}
+        </div>
+
+        {activeTool && (
+          <div
+            style={{
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderLeft: '3px solid var(--accent)',
+              borderRadius: 'var(--radius)',
+              padding: '0.6rem 0.75rem',
+              fontSize: '0.8rem',
+              color: 'var(--text-muted)',
+              marginBottom: 'var(--space-2)',
+            }}
+          >
+            {activeTool === 'print'
+              ? 'Se habilita después de cobrar la mesa — el botón "Imprimir ticket" aparece en la pantalla de confirmación.'
+              : TOOLS.find((t) => t.id === activeTool)?.info}
+          </div>
+        )}
 
         {items.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Sin productos todavía.</p>}
 
@@ -429,4 +787,14 @@ const qtyBtnStyle: React.CSSProperties = {
   cursor: 'pointer',
   fontSize: '0.9rem',
   lineHeight: 1,
+}
+
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '0.6rem',
+  marginBottom: '0.6rem',
+  borderRadius: '6px',
+  border: '1px solid var(--border)',
+  background: 'var(--surface-2)',
+  color: 'var(--text)',
 }
