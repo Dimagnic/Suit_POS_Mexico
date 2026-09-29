@@ -8,6 +8,8 @@ import {
   getAppointments,
 } from './appointment-actions'
 import { generarFactura } from './invoice-actions'
+import PosToolsBar from './pos-tools'
+import { printTicket } from '@/lib/ticket'
 
 type Service = { id: string; name: string; price: number; duration_minutes: number | null }
 type Appointment = {
@@ -39,6 +41,8 @@ const STATUS_COLOR: Record<Appointment['status'], string> = {
   cancelada: 'var(--danger)',
   no_asistio: 'var(--danger)',
 }
+
+const SCAN_HINT = 'No aplica en agenda: los servicios se eligen en el formulario "Nueva cita". El escáner se usa en giros con catálogo amplio de productos.'
 
 export default function AppointmentsClient({
   initialAppointments,
@@ -127,6 +131,19 @@ export default function AppointmentsClient({
   const formatTime = (iso: string) =>
     new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
 
+  const handlePrint = (a: Appointment) => {
+    const price = a.products?.price ?? 0
+    const tax = price * 0.16
+    printTicket({
+      title: giroNombre,
+      subtitle: a.customer_name + ' · ' + formatTime(a.starts_at),
+      lines: [{ label: a.products?.name ?? 'Servicio', amount: price }],
+      subtotal: price,
+      tax,
+      total: price + tax,
+    })
+  }
+
   return (
     <main style={{ padding: 'var(--space-3)', minHeight: '100vh' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
@@ -148,6 +165,15 @@ export default function AppointmentsClient({
         >
           {showForm ? 'Cancelar' : '+ Nueva cita'}
         </button>
+      </div>
+
+      <div style={{ maxWidth: '420px' }}>
+        <PosToolsBar
+          scanNotApplicableHint={SCAN_HINT}
+          onPrint={() => {}}
+          printEnabled={false}
+          printDisabledHint='Usa el botón "🖨️ Ticket" que aparece en cada cita completada.'
+        />
       </div>
 
       {showForm && (
@@ -280,6 +306,9 @@ export default function AppointmentsClient({
                 <button onClick={() => handleComplete(a.id)} style={{ ...actionBtnStyle, background: 'var(--accent)', color: '#1a1206' }}>
                   Completar y cobrar
                 </button>
+              )}
+              {a.status === 'completada' && a.sale_id && (
+                <button onClick={() => handlePrint(a)} style={actionBtnStyle}>🖨️ Ticket</button>
               )}
               {a.status === 'completada' && a.sale_id && !invoiceResults[a.id] && (
                 <button

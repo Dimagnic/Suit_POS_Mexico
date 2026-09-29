@@ -3,9 +3,22 @@
 import { useState } from 'react'
 import { dispenseFuel } from './gas-actions'
 import { generarFactura } from './invoice-actions'
+import PosToolsBar from './pos-tools'
+import { printTicket } from '@/lib/ticket'
 
 type Pump = { id: string; name: string }
 type Fuel = { id: string; name: string; price: number }
+type Receipt = {
+  pumpName: string
+  fuelName: string
+  liters: number
+  unitPrice: number
+  subtotal: number
+  tax: number
+  total: number
+}
+
+const SCAN_HINT = 'No aplica en gasolinera: el combustible se elige de una lista corta. El escáner se usa en giros con catálogo amplio de productos.'
 
 export default function GasClient({
   pumps,
@@ -31,6 +44,7 @@ export default function GasClient({
   const [liters, setLiters] = useState('')
   const [saving, setSaving] = useState(false)
   const [result, setResult] = useState<{ saleId: string; total: number } | null>(null)
+  const [receipt, setReceipt] = useState<Receipt | null>(null)
   const [invoiceLoading, setInvoiceLoading] = useState(false)
   const [invoiceResult, setInvoiceResult] = useState<{ success?: boolean; error?: string; uuid?: string } | null>(null)
 
@@ -64,6 +78,15 @@ export default function GasClient({
       return
     }
 
+    setReceipt({
+      pumpName: pumps.find((p) => p.id === pumpId)?.name ?? '',
+      fuelName: selectedFuel.name,
+      liters: litersNum,
+      unitPrice: selectedFuel.price,
+      subtotal,
+      tax,
+      total: res.total!,
+    })
     setResult({ saleId: res.saleId!, total: res.total! })
   }
 
@@ -75,11 +98,29 @@ export default function GasClient({
     setInvoiceResult(res)
   }
 
+  const handlePrint = () => {
+    if (!receipt) return
+    printTicket({
+      title: giroNombre,
+      subtitle: receipt.pumpName,
+      lines: [
+        {
+          label: receipt.fuelName + ' ' + receipt.liters.toFixed(2) + ' L x $' + receipt.unitPrice.toFixed(2),
+          amount: receipt.subtotal,
+        },
+      ],
+      subtotal: receipt.subtotal,
+      tax: receipt.tax,
+      total: receipt.total,
+    })
+  }
+
   const handleReset = () => {
     setPumpId('')
     setFuelId('')
     setLiters('')
     setResult(null)
+    setReceipt(null)
     setInvoiceResult(null)
   }
 
@@ -95,6 +136,15 @@ export default function GasClient({
           gap: 'var(--space-2)',
         }}
       >
+        <div style={{ width: '100%', maxWidth: '420px' }}>
+          <PosToolsBar
+            scanNotApplicableHint={SCAN_HINT}
+            onPrint={handlePrint}
+            printEnabled={true}
+            printDisabledHint=""
+          />
+        </div>
+
         <p style={{ color: 'var(--success)', fontSize: '1.1rem' }}>
           ✓ Despacho registrado — Total: ${result.total.toFixed(2)}
         </p>
@@ -151,6 +201,13 @@ export default function GasClient({
         <a href="/" style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>← Volver</a>
         <h1 style={{ fontSize: '1.25rem' }}>{giroIcono} {giroNombre}</h1>
       </div>
+
+      <PosToolsBar
+        scanNotApplicableHint={SCAN_HINT}
+        onPrint={handlePrint}
+        printEnabled={false}
+        printDisabledHint="Se habilita después de cobrar el despacho."
+      />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
         <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Bomba</label>

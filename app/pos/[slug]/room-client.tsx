@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { getActiveReservation, createReservation, checkOut } from './hotel-actions'
 import { generarFactura } from './invoice-actions'
+import PosToolsBar from './pos-tools'
+import { printTicket } from '@/lib/ticket'
 
 type Room = { id: string; name: string; status: string }
 type RoomType = { id: string; name: string; price: number }
@@ -15,6 +17,8 @@ type Reservation = {
   room_product_id: string
   products: { name: string; price: number }
 }
+
+const SCAN_HINT = 'No aplica en hotel: el tipo de habitación se elige de una lista corta. El escáner se usa en giros con catálogo amplio de productos.'
 
 export default function RoomClient({
   room,
@@ -108,6 +112,25 @@ export default function RoomClient({
     setInvoiceResult(result)
   }
 
+  const handlePrint = () => {
+    if (!checkoutResult || !reservation) return
+    const nightly = reservation.products.price
+    const subtotal = nightly * checkoutResult.nights
+    printTicket({
+      title: room.name,
+      subtitle: reservation.guest_name + ' · ' + reservation.check_in_date + ' → ' + reservation.check_out_date,
+      lines: [
+        {
+          label: checkoutResult.nights + ' noche(s) x $' + nightly.toFixed(2),
+          amount: subtotal,
+        },
+      ],
+      subtotal,
+      tax: subtotal * 0.16,
+      total: checkoutResult.total,
+    })
+  }
+
   if (loading) {
     return <main style={{ padding: 'var(--space-3)', color: 'var(--text-muted)' }}>Cargando habitación...</main>
   }
@@ -124,6 +147,15 @@ export default function RoomClient({
           gap: 'var(--space-2)',
         }}
       >
+        <div style={{ width: '100%', maxWidth: '480px' }}>
+          <PosToolsBar
+            scanNotApplicableHint={SCAN_HINT}
+            onPrint={handlePrint}
+            printEnabled={true}
+            printDisabledHint=""
+          />
+        </div>
+
         <p style={{ color: 'var(--success)', fontSize: '1.1rem' }}>
           ✓ Check-out {room.name} — {checkoutResult.nights} noche(s) — Total: ${checkoutResult.total.toFixed(2)}
         </p>
@@ -182,6 +214,13 @@ export default function RoomClient({
         </button>
         <h1 style={{ fontSize: '1.25rem' }}>🛏️ {room.name}</h1>
       </div>
+
+      <PosToolsBar
+        scanNotApplicableHint={SCAN_HINT}
+        onPrint={handlePrint}
+        printEnabled={false}
+        printDisabledHint="Se habilita después de hacer el check-out y cobrar."
+      />
 
       {reservation ? (
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 'var(--space-3)' }}>
