@@ -1,7 +1,7 @@
+import { resolveActiveBranch } from '@/lib/branch'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { canManageTeam, type Role } from '@/lib/permissions'
-import { resolveActiveBranch } from '@/lib/branch'
 import BranchSwitcher from './branch-switcher'
 
 export default async function Home() {
@@ -28,7 +28,7 @@ export default async function Home() {
   const role = appUser?.role as Role
   const canSeeAdmin = appUser ? canManageTeam(role) : false
 
-  let branches: { id: string; name: string; is_main: boolean }[] = []
+      let branches: { id: string; name: string; is_main: boolean }[] = []
   let activeBranchId: string | null = null
   if (canSeeAdmin && appUser) {
     const { data } = await supabase
@@ -37,14 +37,19 @@ export default async function Home() {
       .eq('organization_id', appUser.organization_id)
       .order('name')
     branches = data ?? []
-
-    activeBranchId = await resolveActiveBranch(
-      supabase,
-      appUser.organization_id,
-      role,
-      appUser.branch_id
-    )
+    activeBranchId = await resolveActiveBranch(supabase, appUser.organization_id, role, appUser.branch_id)
   }
+
+  const linkStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius)',
+    padding: '0.5rem 1rem',
+    color: 'var(--text-muted)',
+    textDecoration: 'none',
+    fontSize: '0.85rem',
+  } as const
 
   return (
     <main style={{ minHeight: '100vh', padding: 'var(--space-4)' }}>
@@ -64,43 +69,19 @@ export default async function Home() {
         </div>
 
         <div style={{ display: 'flex', gap: 'var(--space-1)', alignItems: 'center' }}>
-          {canSeeAdmin && branches.length > 1 ? (
+                    {canSeeAdmin && branches.length > 1 ? (
             <BranchSwitcher branches={branches} activeBranchId={activeBranchId} />
           ) : null}
 
-          {canSeeAdmin ? (
-            <a
-              href="/branches"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
-                padding: '0.5rem 1rem',
-                color: 'var(--text-muted)',
-                textDecoration: 'none',
-                fontSize: '0.85rem',
-              }}
-            >
-              Sucursales
-            </a>
-          ) : null}
+          {canSeeAdmin ? <a href="/branches" style={linkStyle}>Sucursales</a> : null}
+          {canSeeAdmin ? <a href="/products" style={linkStyle}>Productos</a> : null}
+          {canSeeAdmin ? <a href="/inventory" style={linkStyle}>Inventario</a> : null}
+          {canSeeAdmin ? <a href="/suppliers" style={linkStyle}>Proveedores</a> : null}
+          {canSeeAdmin ? <a href="/purchase-orders" style={linkStyle}>Compras</a> : null}
+          {canSeeAdmin ? <a href="/reports" style={linkStyle}>Reportes</a> : null}
+          {canSeeAdmin ? <a href="/subscription" style={linkStyle}>Suscripción</a> : null}
 
-          <a
-            href="/team"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius)',
-              padding: '0.5rem 1rem',
-              color: 'var(--text-muted)',
-              textDecoration: 'none',
-              fontSize: '0.85rem',
-            }}
-          >
-            Equipo
-          </a>
+          <a href="/team" style={linkStyle}>Equipo</a>
 
           <form action="/auth/signout" method="post">
             <button
