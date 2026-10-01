@@ -16,7 +16,7 @@ function esc(value: string) {
 export function printTicket(data: TicketData) {
   const win = window.open('', '_blank', 'width=320,height=600')
   if (!win) {
-    alert('Tu navegador bloqueó la ventana del ticket. Permite las ventanas emergentes para este sitio e inténtalo de nuevo.')
+    alert('Tu navegador bloqueo la ventana del ticket. Permite las ventanas emergentes para este sitio e intentalo de nuevo.')
     return
   }
 
@@ -42,10 +42,19 @@ export function printTicket(data: TicketData) {
       '<div class="row"><span>Subtotal</span><span>$' + data.subtotal.toFixed(2) + '</span></div>' +
       '<div class="row"><span>IVA (16%)</span><span>$' + data.tax.toFixed(2) + '</span></div>' +
       '<div class="row total"><span>TOTAL</span><span>$' + data.total.toFixed(2) + '</span></div><hr />' +
-      '<div style="text-align:center">¡Gracias por su compra!</div>' +
+      '<div style="text-align:center">Gracias por su compra!</div>' +
       '</body></html>'
   )
   win.document.close()
   win.focus()
+
+  win.onafterprint = () => {
+    win.close()
+  }
+
   win.print()
+
+  setTimeout(() => {
+    if (!win.closed) win.close()
+  }, 60000)
 }
