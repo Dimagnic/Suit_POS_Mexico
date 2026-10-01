@@ -18,7 +18,7 @@ type Reservation = {
   products: { name: string; price: number }
 }
 
-const SCAN_HINT = 'No aplica en hotel: el tipo de habitación se elige de una lista corta. El escáner se usa en giros con catálogo amplio de productos.'
+const SCAN_HINT = 'No aplica en hotel: el tipo de habitacion se elige de una lista corta. El escaner se usa en giros con catalogo amplio de productos.'
 
 export default function RoomClient({
   room,
@@ -44,7 +44,7 @@ export default function RoomClient({
   const [saving, setSaving] = useState(false)
   const [checkoutResult, setCheckoutResult] = useState<{ saleId: string; total: number; nights: number } | null>(null)
   const [invoiceLoading, setInvoiceLoading] = useState(false)
-  const [invoiceResult, setInvoiceResult] = useState<{ success?: boolean; error?: string; uuid?: string } | null>(null)
+  const [invoiceResult, setInvoiceResult] = useState<{ success?: boolean; error?: string; uuid?: string; pdfBase64?: string | null; xmlBase64?: string | null } | null>(null)
 
   const [form, setForm] = useState({
     roomProductId: '',
@@ -118,7 +118,7 @@ export default function RoomClient({
     const subtotal = nightly * checkoutResult.nights
     printTicket({
       title: room.name,
-      subtitle: reservation.guest_name + ' · ' + reservation.check_in_date + ' → ' + reservation.check_out_date,
+      subtitle: reservation.guest_name + ' - ' + reservation.check_in_date + ' a ' + reservation.check_out_date,
       lines: [
         {
           label: checkoutResult.nights + ' noche(s) x $' + nightly.toFixed(2),
@@ -132,7 +132,7 @@ export default function RoomClient({
   }
 
   if (loading) {
-    return <main style={{ padding: 'var(--space-3)', color: 'var(--text-muted)' }}>Cargando habitación...</main>
+    return <main style={{ padding: 'var(--space-3)', color: 'var(--text-muted)' }}>Cargando habitacion...</main>
   }
 
   if (checkoutResult) {
@@ -179,9 +179,19 @@ export default function RoomClient({
         )}
 
         {invoiceResult?.success && (
-          <p style={{ color: 'var(--success)', fontSize: '0.85rem' }}>
-            ✓ Facturado — UUID: <span className="mono">{invoiceResult.uuid}</span>
-          </p>
+          <div style={{ width: '100%', maxWidth: '480px' }}>
+            <p style={{ color: 'var(--success)', fontSize: '0.85rem', margin: '0 0 0.5rem' }}>
+              ✓ Facturado — UUID: <span className="mono">{invoiceResult.uuid}</span>
+            </p>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              {invoiceResult.pdfBase64 && (
+                <a href={'data:application/pdf;base64,' + invoiceResult.pdfBase64} download={'factura-' + invoiceResult.uuid + '.pdf'} style={{ flex: 1, textAlign: 'center', padding: '0.5rem', border: '1px solid var(--accent)', borderRadius: 'var(--radius)', color: 'var(--accent)', fontSize: '0.8rem', textDecoration: 'none' }}>Descargar PDF</a>
+              )}
+              {invoiceResult.xmlBase64 && (
+                <a href={'data:application/xml;base64,' + invoiceResult.xmlBase64} download={'factura-' + invoiceResult.uuid + '.xml'} style={{ flex: 1, textAlign: 'center', padding: '0.5rem', border: '1px solid var(--border)', borderRadius: 'var(--radius)', color: 'var(--text)', fontSize: '0.8rem', textDecoration: 'none' }}>Descargar XML</a>
+              )}
+            </div>
+          </div>
         )}
 
         {invoiceResult?.error && (
@@ -219,7 +229,7 @@ export default function RoomClient({
         scanNotApplicableHint={SCAN_HINT}
         onPrint={handlePrint}
         printEnabled={false}
-        printDisabledHint="Se habilita después de hacer el check-out y cobrar."
+        printDisabledHint="Se habilita despues de hacer el check-out y cobrar."
       />
 
       {reservation ? (
@@ -227,7 +237,7 @@ export default function RoomClient({
           <p style={{ margin: '0 0 0.5rem' }}><strong>{reservation.guest_name}</strong></p>
           {reservation.guest_phone && <p style={{ margin: '0 0 0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>{reservation.guest_phone}</p>}
           <p style={{ margin: '0 0 0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            {reservation.check_in_date} → {reservation.check_out_date}
+            {reservation.check_in_date} a {reservation.check_out_date}
           </p>
           <p className="mono" style={{ color: 'var(--accent)', fontSize: '1.1rem', margin: '0 0 1rem' }}>
             ${reservation.products.price.toFixed(2)} / noche
@@ -257,21 +267,21 @@ export default function RoomClient({
             onChange={(e) => setForm({ ...form, roomProductId: e.target.value })}
             style={inputStyle}
           >
-            <option value="">Tipo de habitación...</option>
+            <option value="">Tipo de habitacion...</option>
             {roomTypes.map((rt) => (
               <option key={rt.id} value={rt.id}>{rt.name} — ${rt.price.toFixed(2)}/noche</option>
             ))}
           </select>
 
           <input
-            placeholder="Nombre del huésped"
+            placeholder="Nombre del huesped"
             value={form.guestName}
             onChange={(e) => setForm({ ...form, guestName: e.target.value })}
             style={inputStyle}
           />
 
           <input
-            placeholder="Teléfono (opcional)"
+            placeholder="Telefono (opcional)"
             value={form.guestPhone}
             onChange={(e) => setForm({ ...form, guestPhone: e.target.value })}
             style={inputStyle}
@@ -307,7 +317,7 @@ export default function RoomClient({
               marginTop: 'var(--space-1)',
             }}
           >
-            {saving ? 'Guardando...' : 'Registrar reservación (check-in)'}
+            {saving ? 'Guardando...' : 'Registrar reservacion (check-in)'}
           </button>
         </div>
       )}

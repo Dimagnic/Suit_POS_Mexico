@@ -30,7 +30,7 @@ const STATUS_LABEL: Record<Appointment['status'], string> = {
   en_curso: 'En curso',
   completada: 'Completada',
   cancelada: 'Cancelada',
-  no_asistio: 'No asistió',
+  no_asistio: 'No asistio',
 }
 
 const STATUS_COLOR: Record<Appointment['status'], string> = {
@@ -42,7 +42,9 @@ const STATUS_COLOR: Record<Appointment['status'], string> = {
   no_asistio: 'var(--danger)',
 }
 
-const SCAN_HINT = 'No aplica en agenda: los servicios se eligen en el formulario "Nueva cita". El escáner se usa en giros con catálogo amplio de productos.'
+const SCAN_HINT = 'No aplica en agenda: los servicios se eligen en el formulario "Nueva cita". El escaner se usa en giros con catalogo amplio de productos.'
+
+type InvoiceResult = { success?: boolean; error?: string; uuid?: string; pdfBase64?: string | null; xmlBase64?: string | null }
 
 export default function AppointmentsClient({
   initialAppointments,
@@ -71,7 +73,7 @@ export default function AppointmentsClient({
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [invoiceLoading, setInvoiceLoading] = useState<string | null>(null)
-  const [invoiceResults, setInvoiceResults] = useState<Record<string, { success?: boolean; error?: string; uuid?: string }>>({})
+  const [invoiceResults, setInvoiceResults] = useState<Record<string, InvoiceResult>>({})
 
   const [form, setForm] = useState({ serviceId: '', customerName: '', customerPhone: '', time: '' })
 
@@ -136,7 +138,7 @@ export default function AppointmentsClient({
     const tax = price * 0.16
     printTicket({
       title: giroNombre,
-      subtitle: a.customer_name + ' · ' + formatTime(a.starts_at),
+      subtitle: a.customer_name + ' - ' + formatTime(a.starts_at),
       lines: [{ label: a.products?.name ?? 'Servicio', amount: price }],
       subtotal: price,
       tax,
@@ -172,7 +174,7 @@ export default function AppointmentsClient({
           scanNotApplicableHint={SCAN_HINT}
           onPrint={() => {}}
           printEnabled={false}
-          printDisabledHint='Usa el botón "🖨️ Ticket" que aparece en cada cita completada.'
+          printDisabledHint='Usa el boton "Ticket" que aparece en cada cita completada.'
         />
       </div>
 
@@ -197,7 +199,7 @@ export default function AppointmentsClient({
               onChange={(e) => setForm({ ...form, serviceId: e.target.value })}
               style={inputStyle}
             >
-              <option value="">Selecciona…</option>
+              <option value="">Selecciona...</option>
               {services.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name} — ${s.price.toFixed(2)} ({s.duration_minutes ?? 30} min)
@@ -217,12 +219,12 @@ export default function AppointmentsClient({
           </label>
 
           <label style={fieldStyle}>
-            Teléfono (opcional)
+            Telefono (opcional)
             <input
               value={form.customerPhone}
               onChange={(e) => setForm({ ...form, customerPhone: e.target.value })}
               style={inputStyle}
-              placeholder="10 dígitos"
+              placeholder="10 digitos"
             />
           </label>
 
@@ -249,7 +251,7 @@ export default function AppointmentsClient({
               cursor: saving ? 'not-allowed' : 'pointer',
             }}
           >
-            {saving ? 'Guardando…' : 'Agendar'}
+            {saving ? 'Guardando...' : 'Agendar'}
           </button>
         </div>
       )}
@@ -282,14 +284,14 @@ export default function AppointmentsClient({
               <strong>{a.customer_name}</strong>
               <p style={{ margin: '0.25rem 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                 {a.products?.name}
-                {a.customer_phone ? ` · ${a.customer_phone}` : ''}
+                {a.customer_phone ? ` - ${a.customer_phone}` : ''}
               </p>
               <p style={{ margin: '0.15rem 0 0', fontSize: '0.75rem', color: STATUS_COLOR[a.status] }}>
                 {STATUS_LABEL[a.status]}
               </p>
             </div>
 
-            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
               {a.status === 'pendiente' && (
                 <>
                   <button onClick={() => handleStatus(a.id, 'confirmada')} style={actionBtnStyle}>Confirmar</button>
@@ -299,7 +301,7 @@ export default function AppointmentsClient({
               {a.status === 'confirmada' && (
                 <>
                   <button onClick={() => handleStatus(a.id, 'en_curso')} style={actionBtnStyle}>Iniciar</button>
-                  <button onClick={() => handleStatus(a.id, 'no_asistio')} style={actionBtnStyle}>No asistió</button>
+                  <button onClick={() => handleStatus(a.id, 'no_asistio')} style={actionBtnStyle}>No asistio</button>
                 </>
               )}
               {a.status === 'en_curso' && (
@@ -308,7 +310,7 @@ export default function AppointmentsClient({
                 </button>
               )}
               {a.status === 'completada' && a.sale_id && (
-                <button onClick={() => handlePrint(a)} style={actionBtnStyle}>🖨️ Ticket</button>
+                <button onClick={() => handlePrint(a)} style={actionBtnStyle}>Ticket</button>
               )}
               {a.status === 'completada' && a.sale_id && !invoiceResults[a.id] && (
                 <button
@@ -316,16 +318,38 @@ export default function AppointmentsClient({
                   disabled={invoiceLoading === a.id}
                   style={actionBtnStyle}
                 >
-                  {invoiceLoading === a.id ? 'Generando…' : 'Generar factura CFDI'}
+                  {invoiceLoading === a.id ? 'Generando...' : 'Generar factura CFDI'}
                 </button>
               )}
               {invoiceResults[a.id]?.success && (
-                <span style={{ fontSize: '0.75rem', color: 'var(--success)' }}>
-                  ✓ UUID: <span className="mono">{invoiceResults[a.id].uuid}</span>
-                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--success)' }}>
+                    Facturado — UUID: <span className="mono">{invoiceResults[a.id].uuid}</span>
+                  </span>
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    {invoiceResults[a.id].pdfBase64 && (
+                      <a
+                        href={'data:application/pdf;base64,' + invoiceResults[a.id].pdfBase64}
+                        download={'factura-' + invoiceResults[a.id].uuid + '.pdf'}
+                        style={{ padding: '0.3rem 0.6rem', border: '1px solid var(--accent)', borderRadius: 'var(--radius)', color: 'var(--accent)', fontSize: '0.75rem', textDecoration: 'none' }}
+                      >
+                        Descargar PDF
+                      </a>
+                    )}
+                    {invoiceResults[a.id].xmlBase64 && (
+                      <a
+                        href={'data:application/xml;base64,' + invoiceResults[a.id].xmlBase64}
+                        download={'factura-' + invoiceResults[a.id].uuid + '.xml'}
+                        style={{ padding: '0.3rem 0.6rem', border: '1px solid var(--border)', borderRadius: 'var(--radius)', color: 'var(--text)', fontSize: '0.75rem', textDecoration: 'none' }}
+                      >
+                        Descargar XML
+                      </a>
+                    )}
+                  </div>
+                </div>
               )}
               {invoiceResults[a.id]?.error && (
-                <span style={{ fontSize: '0.75rem', color: 'var(--danger)' }}>✕ {invoiceResults[a.id].error}</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--danger)' }}>{invoiceResults[a.id].error}</span>
               )}
             </div>
           </div>

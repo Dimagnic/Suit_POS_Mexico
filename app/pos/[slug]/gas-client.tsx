@@ -18,7 +18,7 @@ type Receipt = {
   total: number
 }
 
-const SCAN_HINT = 'No aplica en gasolinera: el combustible se elige de una lista corta. El escáner se usa en giros con catálogo amplio de productos.'
+const SCAN_HINT = 'No aplica en gasolinera: el combustible se elige de una lista corta. El escaner se usa en giros con catalogo amplio de productos.'
 
 export default function GasClient({
   pumps,
@@ -46,7 +46,7 @@ export default function GasClient({
   const [result, setResult] = useState<{ saleId: string; total: number } | null>(null)
   const [receipt, setReceipt] = useState<Receipt | null>(null)
   const [invoiceLoading, setInvoiceLoading] = useState(false)
-  const [invoiceResult, setInvoiceResult] = useState<{ success?: boolean; error?: string; uuid?: string } | null>(null)
+  const [invoiceResult, setInvoiceResult] = useState<{ success?: boolean; error?: string; uuid?: string; pdfBase64?: string | null; xmlBase64?: string | null } | null>(null)
 
   const selectedFuel = fuels.find((f) => f.id === fuelId)
   const litersNum = parseFloat(liters) || 0
@@ -168,9 +168,19 @@ export default function GasClient({
         )}
 
         {invoiceResult?.success && (
-          <p style={{ color: 'var(--success)', fontSize: '0.85rem' }}>
-            ✓ Facturado — UUID: <span className="mono">{invoiceResult.uuid}</span>
-          </p>
+          <div style={{ width: '100%', maxWidth: '420px' }}>
+            <p style={{ color: 'var(--success)', fontSize: '0.85rem', margin: '0 0 0.5rem' }}>
+              ✓ Facturado — UUID: <span className="mono">{invoiceResult.uuid}</span>
+            </p>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              {invoiceResult.pdfBase64 && (
+                <a href={'data:application/pdf;base64,' + invoiceResult.pdfBase64} download={'factura-' + invoiceResult.uuid + '.pdf'} style={{ flex: 1, textAlign: 'center', padding: '0.5rem', border: '1px solid var(--accent)', borderRadius: 'var(--radius)', color: 'var(--accent)', fontSize: '0.8rem', textDecoration: 'none' }}>Descargar PDF</a>
+              )}
+              {invoiceResult.xmlBase64 && (
+                <a href={'data:application/xml;base64,' + invoiceResult.xmlBase64} download={'factura-' + invoiceResult.uuid + '.xml'} style={{ flex: 1, textAlign: 'center', padding: '0.5rem', border: '1px solid var(--border)', borderRadius: 'var(--radius)', color: 'var(--text)', fontSize: '0.8rem', textDecoration: 'none' }}>Descargar XML</a>
+              )}
+            </div>
+          </div>
         )}
 
         {invoiceResult?.error && (
@@ -206,7 +216,7 @@ export default function GasClient({
         scanNotApplicableHint={SCAN_HINT}
         onPrint={handlePrint}
         printEnabled={false}
-        printDisabledHint="Se habilita después de cobrar el despacho."
+        printDisabledHint="Se habilita despues de cobrar el despacho."
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
