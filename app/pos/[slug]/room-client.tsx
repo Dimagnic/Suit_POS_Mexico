@@ -5,6 +5,7 @@ import { getActiveReservation, createReservation, checkOut } from './hotel-actio
 import { generarFactura } from './invoice-actions'
 import PosToolsBar from './pos-tools'
 import { printTicket } from '@/lib/ticket'
+import InvoiceModal, { type Receptor } from './invoice-modal'
 
 type Room = { id: string; name: string; status: string }
 type RoomType = { id: string; name: string; price: number }
@@ -43,6 +44,7 @@ export default function RoomClient({
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [checkoutResult, setCheckoutResult] = useState<{ saleId: string; total: number; nights: number } | null>(null)
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [invoiceLoading, setInvoiceLoading] = useState(false)
   const [invoiceResult, setInvoiceResult] = useState<{ success?: boolean; error?: string; uuid?: string; pdfBase64?: string | null; xmlBase64?: string | null } | null>(null)
 
@@ -104,12 +106,13 @@ export default function RoomClient({
     setCheckoutResult({ saleId: result.saleId!, total: result.total!, nights: result.nights! })
   }
 
-  const handleInvoice = async () => {
+  const handleInvoiceSubmit = async (receptor?: Receptor) => {
     if (!checkoutResult) return
     setInvoiceLoading(true)
-    const result = await generarFactura(checkoutResult.saleId)
+    const result = await generarFactura(checkoutResult.saleId, receptor)
     setInvoiceLoading(false)
     setInvoiceResult(result)
+    if (!result.error) setShowInvoiceModal(false)
   }
 
   const handlePrint = () => {
@@ -160,9 +163,9 @@ export default function RoomClient({
           ✓ Check-out {room.name} — {checkoutResult.nights} noche(s) — Total: ${checkoutResult.total.toFixed(2)}
         </p>
 
-        {!invoiceResult && (
+        {!invoiceResult?.success && (
           <button
-            onClick={handleInvoice}
+            onClick={() => setShowInvoiceModal(true)}
             disabled={invoiceLoading}
             style={{
               padding: '0.6rem 1.5rem',
@@ -174,7 +177,7 @@ export default function RoomClient({
               fontSize: '0.9rem',
             }}
           >
-            {invoiceLoading ? 'Generando factura...' : 'Generar factura CFDI'}
+            Generar factura CFDI
           </button>
         )}
 
@@ -194,7 +197,7 @@ export default function RoomClient({
           </div>
         )}
 
-        {invoiceResult?.error && (
+        {invoiceResult?.error && !showInvoiceModal && (
           <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>✕ {invoiceResult.error}</p>
         )}
 
@@ -212,6 +215,14 @@ export default function RoomClient({
         >
           Volver a habitaciones
         </button>
+
+        <InvoiceModal
+          open={showInvoiceModal}
+          onCancel={() => setShowInvoiceModal(false)}
+          onSubmit={handleInvoiceSubmit}
+          loading={invoiceLoading}
+          error={invoiceResult?.error}
+        />
       </main>
     )
   }

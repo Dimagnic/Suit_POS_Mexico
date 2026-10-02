@@ -5,6 +5,7 @@ import { dispenseFuel } from './gas-actions'
 import { generarFactura } from './invoice-actions'
 import PosToolsBar from './pos-tools'
 import { printTicket } from '@/lib/ticket'
+import InvoiceModal, { type Receptor } from './invoice-modal'
 
 type Pump = { id: string; name: string }
 type Fuel = { id: string; name: string; price: number }
@@ -45,6 +46,7 @@ export default function GasClient({
   const [saving, setSaving] = useState(false)
   const [result, setResult] = useState<{ saleId: string; total: number } | null>(null)
   const [receipt, setReceipt] = useState<Receipt | null>(null)
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [invoiceLoading, setInvoiceLoading] = useState(false)
   const [invoiceResult, setInvoiceResult] = useState<{ success?: boolean; error?: string; uuid?: string; pdfBase64?: string | null; xmlBase64?: string | null } | null>(null)
 
@@ -90,12 +92,13 @@ export default function GasClient({
     setResult({ saleId: res.saleId!, total: res.total! })
   }
 
-  const handleInvoice = async () => {
+  const handleInvoiceSubmit = async (receptor?: Receptor) => {
     if (!result) return
     setInvoiceLoading(true)
-    const res = await generarFactura(result.saleId)
+    const res = await generarFactura(result.saleId, receptor)
     setInvoiceLoading(false)
     setInvoiceResult(res)
+    if (!res.error) setShowInvoiceModal(false)
   }
 
   const handlePrint = () => {
@@ -149,9 +152,9 @@ export default function GasClient({
           ✓ Despacho registrado — Total: ${result.total.toFixed(2)}
         </p>
 
-        {!invoiceResult && (
+        {!invoiceResult?.success && (
           <button
-            onClick={handleInvoice}
+            onClick={() => setShowInvoiceModal(true)}
             disabled={invoiceLoading}
             style={{
               padding: '0.6rem 1.5rem',
@@ -163,7 +166,7 @@ export default function GasClient({
               fontSize: '0.9rem',
             }}
           >
-            {invoiceLoading ? 'Generando factura...' : 'Generar factura CFDI'}
+            Generar factura CFDI
           </button>
         )}
 
@@ -183,7 +186,7 @@ export default function GasClient({
           </div>
         )}
 
-        {invoiceResult?.error && (
+        {invoiceResult?.error && !showInvoiceModal && (
           <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>✕ {invoiceResult.error}</p>
         )}
 
@@ -201,6 +204,14 @@ export default function GasClient({
         >
           Nuevo despacho
         </button>
+
+        <InvoiceModal
+          open={showInvoiceModal}
+          onCancel={() => setShowInvoiceModal(false)}
+          onSubmit={handleInvoiceSubmit}
+          loading={invoiceLoading}
+          error={invoiceResult?.error}
+        />
       </main>
     )
   }

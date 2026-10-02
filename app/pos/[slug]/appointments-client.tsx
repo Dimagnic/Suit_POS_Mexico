@@ -10,6 +10,7 @@ import {
 import { generarFactura } from './invoice-actions'
 import PosToolsBar from './pos-tools'
 import { printTicket } from '@/lib/ticket'
+import InvoiceModal, { type Receptor } from './invoice-modal'
 
 type Service = { id: string; name: string; price: number; duration_minutes: number | null }
 type Appointment = {
@@ -73,6 +74,7 @@ export default function AppointmentsClient({
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [invoiceLoading, setInvoiceLoading] = useState<string | null>(null)
+  const [invoiceModalFor, setInvoiceModalFor] = useState<string | null>(null)
   const [invoiceResults, setInvoiceResults] = useState<Record<string, InvoiceResult>>({})
 
   const [form, setForm] = useState({ serviceId: '', customerName: '', customerPhone: '', time: '' })
@@ -123,11 +125,12 @@ export default function AppointmentsClient({
     await refresh()
   }
 
-  const handleInvoice = async (appointmentId: string, saleId: string) => {
+  const handleInvoiceSubmit = async (appointmentId: string, saleId: string, receptor?: Receptor) => {
     setInvoiceLoading(appointmentId)
-    const result = await generarFactura(saleId)
+    const result = await generarFactura(saleId, receptor)
     setInvoiceLoading(null)
     setInvoiceResults((prev) => ({ ...prev, [appointmentId]: result }))
+    if (!result.error) setInvoiceModalFor(null)
   }
 
   const formatTime = (iso: string) =>
@@ -312,9 +315,9 @@ export default function AppointmentsClient({
               {a.status === 'completada' && a.sale_id && (
                 <button onClick={() => handlePrint(a)} style={actionBtnStyle}>Ticket</button>
               )}
-              {a.status === 'completada' && a.sale_id && !invoiceResults[a.id] && (
+              {a.status === 'completada' && a.sale_id && !invoiceResults[a.id]?.success && (
                 <button
-                  onClick={() => handleInvoice(a.id, a.sale_id!)}
+                  onClick={() => setInvoiceModalFor(a.id)}
                   disabled={invoiceLoading === a.id}
                   style={actionBtnStyle}
                 >
@@ -348,13 +351,24 @@ export default function AppointmentsClient({
                   </div>
                 </div>
               )}
-              {invoiceResults[a.id]?.error && (
+              {invoiceResults[a.id]?.error && invoiceModalFor !== a.id && (
                 <span style={{ fontSize: '0.75rem', color: 'var(--danger)' }}>{invoiceResults[a.id].error}</span>
               )}
             </div>
           </div>
         ))}
       </div>
+
+      <InvoiceModal
+        open={invoiceModalFor !== null}
+        onCancel={() => setInvoiceModalFor(null)}
+        onSubmit={(receptor) => {
+          const a = appointments.find((x) => x.id === invoiceModalFor)
+          if (a && a.sale_id) handleInvoiceSubmit(a.id, a.sale_id, receptor)
+        }}
+        loading={invoiceLoading === invoiceModalFor}
+        error={invoiceModalFor ? invoiceResults[invoiceModalFor]?.error : null}
+      />
     </main>
   )
 }
