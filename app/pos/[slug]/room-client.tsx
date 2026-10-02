@@ -21,6 +21,14 @@ type Reservation = {
 
 const SCAN_HINT = 'No aplica en hotel: el tipo de habitacion se elige de una lista corta. El escaner se usa en giros con catalogo amplio de productos.'
 
+function calcNights(checkIn: string, checkOut: string) {
+  if (!checkIn || !checkOut) return 0
+  const d1 = new Date(checkIn + 'T00:00:00')
+  const d2 = new Date(checkOut + 'T00:00:00')
+  const diff = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24))
+  return diff > 0 ? diff : 0
+}
+
 export default function RoomClient({
   room,
   roomTypes,
@@ -198,7 +206,7 @@ export default function RoomClient({
         )}
 
         {invoiceResult?.error && !showInvoiceModal && (
-          <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>✕ {invoiceResult.error}</p>
+          <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>✗ {invoiceResult.error}</p>
         )}
 
         <button
@@ -227,6 +235,11 @@ export default function RoomClient({
     )
   }
 
+  const nightsPreview = reservation ? calcNights(reservation.check_in_date, reservation.check_out_date) : 0
+  const subtotalPreview = reservation ? reservation.products.price * nightsPreview : 0
+  const taxPreview = subtotalPreview * 0.16
+  const totalPreview = subtotalPreview + taxPreview
+
   return (
     <main style={{ padding: 'var(--space-3)', minHeight: '100vh', maxWidth: '480px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', marginBottom: 'var(--space-3)' }}>
@@ -253,6 +266,21 @@ export default function RoomClient({
           <p className="mono" style={{ color: 'var(--accent)', fontSize: '1.1rem', margin: '0 0 1rem' }}>
             ${reservation.products.price.toFixed(2)} / noche
           </p>
+
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+              <span>Subtotal ({nightsPreview} noche{nightsPreview === 1 ? '' : 's'})</span>
+              <span className="mono">${subtotalPreview.toFixed(2)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+              <span>IVA (16%)</span>
+              <span className="mono">${taxPreview.toFixed(2)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.25rem', fontWeight: 600 }}>
+              <span>Total</span>
+              <span className="mono">${totalPreview.toFixed(2)}</span>
+            </div>
+          </div>
 
           <button
             onClick={handleCheckOut}

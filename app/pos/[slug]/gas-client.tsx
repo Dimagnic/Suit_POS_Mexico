@@ -187,7 +187,7 @@ export default function GasClient({
         )}
 
         {invoiceResult?.error && !showInvoiceModal && (
-          <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>✕ {invoiceResult.error}</p>
+          <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>✗ {invoiceResult.error}</p>
         )}
 
         <button
