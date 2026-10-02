@@ -6,8 +6,9 @@ import {
   getOrderItems,
   addOrderItem,
   changeOrderItemQty,
-  closeTableOrder,
+    closeTableOrder,
   updateBottleStatus,
+  toggleCortesia,
 } from './table-actions'
 import { generarFactura } from './invoice-actions'
 
@@ -20,8 +21,11 @@ type OrderItem = {
   unit_price: number
   bottle_status: 'sellada' | 'abierta' | 'vacia' | null
   ml_restante: number | null
+  is_cortesia: boolean
   products: { name: string; category: string | null; ml_total: number | null }
 }
+
+const PADENTRO_ORG_ID = 'a9fc34de-ecf9-44e7-b008-21427324a807'
 
 const TOOLS = [
   {
@@ -202,8 +206,13 @@ export default function TableOrderClient({
     await refreshItems()
   }
 
-  const handleQty = async (itemId: string, delta: number) => {
+    const handleQty = async (itemId: string, delta: number) => {
     await changeOrderItemQty(itemId, delta)
+    await refreshItems()
+  }
+
+  const handleCortesia = async (itemId: string) => {
+    await toggleCortesia(itemId)
     await refreshItems()
   }
 
@@ -664,9 +673,10 @@ export default function TableOrderClient({
         {items.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Sin productos todavía.</p>}
 
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          {items.map((item) => {
+                    {items.map((item) => {
             const isBottle = item.products?.category === 'botella'
             const isCover = item.products?.category === 'cover'
+            const esPadentro = organizationId === PADENTRO_ORG_ID
             return (
               <div
                 key={item.id}
@@ -682,10 +692,27 @@ export default function TableOrderClient({
                       ${item.unit_price.toFixed(2)} {isCover ? '/ persona' : 'c/u'}
                     </small>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <button onClick={() => handleQty(item.id, -1)} style={qtyBtnStyle}>−</button>
                     <span className="mono" style={{ minWidth: '1.5rem', textAlign: 'center' }}>{item.quantity}</span>
                     {!isBottle && <button onClick={() => handleQty(item.id, 1)} style={qtyBtnStyle}>+</button>}
+                    {esPadentro && (
+                      <button
+                        onClick={() => handleCortesia(item.id)}
+                        style={{
+                          marginLeft: '0.4rem',
+                          padding: '0.2rem 0.5rem',
+                          fontSize: '0.7rem',
+                          borderRadius: 'var(--radius)',
+                          border: '1px solid var(--accent)',
+                          background: item.is_cortesia ? 'var(--accent)' : 'transparent',
+                          color: item.is_cortesia ? '#fff' : 'var(--accent)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {item.is_cortesia ? '🎁 Cortesia ✓' : '🎁 Cortesia'}
+                      </button>
+                    )}
                   </div>
                 </div>
 
