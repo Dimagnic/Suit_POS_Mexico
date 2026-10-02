@@ -32,7 +32,7 @@ export async function getOrderItems(orderId: string) {
   const supabase = await createClient()
   const { data } = await supabase
     .from('table_order_items')
-    .select('id, product_id, quantity, unit_price, bottle_status, ml_restante, products(name, category, ml_total)')
+    .select('id, product_id, quantity, unit_price, bottle_status, ml_restante, is_cortesia, products(name, category, ml_total)')
     .eq('table_order_id', orderId)
     .order('created_at')
   return data ?? []
@@ -106,6 +106,31 @@ export async function changeOrderItemQty(itemId: string, delta: number) {
   } else {
     await supabase.from('table_order_items').update({ quantity: newQty }).eq('id', itemId)
   }
+}
+
+export async function toggleCortesia(itemId: string) {
+  const supabase = await createClient()
+  const { data: item } = await supabase
+    .from('table_order_items')
+    .select('unit_price, original_price, is_cortesia')
+    .eq('id', itemId)
+    .single()
+
+  if (!item) return { error: 'No se encontro el producto.' }
+
+  if (item.is_cortesia) {
+    await supabase
+      .from('table_order_items')
+      .update({ unit_price: item.original_price, is_cortesia: false, original_price: null })
+      .eq('id', itemId)
+  } else {
+    await supabase
+      .from('table_order_items')
+      .update({ original_price: item.unit_price, unit_price: 0, is_cortesia: true })
+      .eq('id', itemId)
+  }
+
+  return { success: true }
 }
 
 export async function closeTableOrder(
@@ -283,7 +308,7 @@ export async function renameTable(tableId: string, newName: string) {
     .single()
 
   if (!target || target.organization_id !== current.organization_id) {
-    return { error: 'Esa mesa no pertenece a tu organización.' }
+    return { error: 'Esa mesa no pertenece a tu organizacion.' }
   }
 
   const { error } = await supabase
@@ -308,7 +333,7 @@ export async function deleteTable(tableId: string) {
     .single()
 
   if (!target || target.organization_id !== current.organization_id) {
-    return { error: 'Esa mesa no pertenece a tu organización.' }
+    return { error: 'Esa mesa no pertenece a tu organizacion.' }
   }
 
   if (target.status === 'occupied') {
