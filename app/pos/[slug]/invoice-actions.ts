@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { crearCfdi, descargarXml, descargarPdf } from '@/lib/facturama/client'
+import { crearCfdi, crearCfdiMultiemisor, descargarXml, descargarPdf } from '@/lib/facturama/client'
 
 type ReceptorInput = {
   rfc: string
@@ -20,7 +20,7 @@ function validarRfc(rfc: string): boolean {
 export async function generarFactura(saleId: string, receptor?: ReceptorInput) {
   const supabase = await createClient()
 
-  // Receptor por defecto: Público en General
+  // Receptor por defecto: Publico en General
   let receptorFinal = {
     rfc: RFC_PUBLICO_GENERAL,
     razonSocial: 'PUBLICO EN GENERAL',
@@ -32,13 +32,13 @@ export async function generarFactura(saleId: string, receptor?: ReceptorInput) {
     const rfcLimpio = receptor.rfc.trim().toUpperCase()
 
     if (!validarRfc(rfcLimpio)) {
-      return { error: 'El RFC no tiene un formato válido. Verifícalo e intenta de nuevo.' }
+      return { error: 'El RFC no tiene un formato valido. Verificalo e intenta de nuevo.' }
     }
     if (!receptor.razonSocial.trim()) {
-      return { error: 'Falta la razón social del receptor.' }
+      return { error: 'Falta la razon social del receptor.' }
     }
     if (!receptor.regimenFiscal) {
-      return { error: 'Falta el régimen fiscal del receptor.' }
+      return { error: 'Falta el regimen fiscal del receptor.' }
     }
     if (!receptor.usoCfdi) {
       return { error: 'Falta el uso de CFDI.' }
@@ -59,7 +59,7 @@ export async function generarFactura(saleId: string, receptor?: ReceptorInput) {
     .single()
 
   if (saleError || !sale) {
-    return { error: 'No se encontró la venta.' }
+    return { error: 'No se encontro la venta.' }
   }
 
   const { data: items, error: itemsError } = await supabase
@@ -78,8 +78,16 @@ export async function generarFactura(saleId: string, receptor?: ReceptorInput) {
     .single()
 
   if (fpError || !fiscalProfile) {
-    return { error: 'Tu organización no tiene un perfil fiscal configurado.' }
+    return { error: 'Tu organizacion no tiene un perfil fiscal configurado.' }
   }
+
+  const { data: csd } = await supabase
+    .from('csd_credentials')
+    .select('id')
+    .eq('organization_id', sale.organization_id)
+    .maybeSingle()
+
+  const usarMultiemisor = !!csd
 
   const now = new Date(sale.created_at)
 
@@ -107,7 +115,7 @@ export async function generarFactura(saleId: string, receptor?: ReceptorInput) {
     }
   })
 
-  const payload = {
+  const payload: any = {
     NameId: '1',
     Currency: 'MXN',
     ExpeditionPlace: fiscalProfile.codigo_postal,
@@ -131,7 +139,15 @@ export async function generarFactura(saleId: string, receptor?: ReceptorInput) {
     Items: cfdiItems,
   }
 
-  const result = await crearCfdi(payload)
+  if (usarMultiemisor) {
+    payload.Issuer = {
+      Rfc: fiscalProfile.rfc,
+      Name: fiscalProfile.razon_social,
+      FiscalRegime: fiscalProfile.regimen_fiscal,
+    }
+  }
+
+  const result = usarMultiemisor ? await crearCfdiMultiemisor(payload) : await crearCfdi(payload)
 
   if (!result.ok) {
     await supabase.from('invoices').insert({
@@ -144,7 +160,7 @@ export async function generarFactura(saleId: string, receptor?: ReceptorInput) {
       status: 'error',
       pac_response: result.error,
     })
-    return { error: 'Facturama rechazó el CFDI. Revisa los detalles en Supabase → invoices.' }
+    return { error: 'Facturama rechazo el CFDI. Revisa los detalles en Supabase -> invoices.' }
   }
 
   const cfdi = result.data as any
@@ -174,7 +190,7 @@ export async function generarFactura(saleId: string, receptor?: ReceptorInput) {
   })
 
   if (insertError) {
-    return { error: 'Se timbró correctamente pero no se pudo guardar en la base de datos: ' + insertError.message }
+    return { error: 'Se timbro correctamente pero no se pudo guardar en la base de datos: ' + insertError.message }
   }
 
   return {

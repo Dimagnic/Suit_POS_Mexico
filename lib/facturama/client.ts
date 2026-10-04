@@ -26,6 +26,49 @@ export async function crearCfdi(payload: unknown) {
   return { ok: true as const, data }
 }
 
+export async function registrarCsd(rfc: string, certificateBase64: string, privateKeyBase64: string, privateKeyPassword: string) {
+  const response = await fetch(`${FACTURAMA_URL}/api-lite/csds`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: getAuthHeader(),
+    },
+    body: JSON.stringify({
+      Rfc: rfc,
+      Certificate: certificateBase64,
+      PrivateKey: privateKeyBase64,
+      PrivateKeyPassword: privateKeyPassword,
+    }),
+  })
+
+  const data = await response.json().catch(() => null)
+
+  if (!response.ok) {
+    return { ok: false as const, error: data ?? `Error ${response.status} al registrar el CSD` }
+  }
+
+  return { ok: true as const, data }
+}
+
+export async function crearCfdiMultiemisor(payload: unknown) {
+  const response = await fetch(`${FACTURAMA_URL}/api-lite/3/cfdis`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: getAuthHeader(),
+    },
+    body: JSON.stringify(payload),
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    return { ok: false as const, error: data }
+  }
+
+  return { ok: true as const, data }
+}
+
 // Descarga el XML o PDF de un CFDI ya timbrado.
 async function descargarArchivo(format: 'xml' | 'pdf', cfdiId: string) {
   const response = await fetch(`${FACTURAMA_URL}/Cfdi/${format}/issued/${cfdiId}`, {
@@ -45,7 +88,7 @@ async function descargarArchivo(format: 'xml' | 'pdf', cfdiId: string) {
   try {
     data = JSON.parse(rawText)
   } catch {
-    return { ok: false as const, error: `Respuesta de ${format} no es JSON válido` }
+    return { ok: false as const, error: `Respuesta de ${format} no es JSON valido` }
   }
 
   const base64Content = data.Content ?? data.content ?? null

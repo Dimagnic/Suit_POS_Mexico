@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { X509Certificate } from 'crypto'
 import { encryptToBase64, encryptText } from '@/lib/crypto/csd'
+import { registrarCsd } from '@/lib/facturama/client'
 import { revalidatePath } from 'next/cache'
 
 async function getCurrentUser() {
@@ -53,6 +54,22 @@ export async function uploadCsd(cerBase64: string, keyBase64: string, password: 
   }
 
   const supabase = await createClient()
+
+  const { data: fiscalProfile, error: fpError } = await supabase
+    .from('fiscal_profiles')
+    .select('rfc')
+    .eq('organization_id', current.organization_id)
+    .single()
+
+  if (fpError || !fiscalProfile) {
+    return { error: 'Tu organizacion no tiene un perfil fiscal configurado (RFC, razon social, etc). Configuralo antes de subir el CSD.' }
+  }
+
+  const registro = await registrarCsd(fiscalProfile.rfc, cerBase64, keyBase64, password)
+
+  if (!registro.ok) {
+    return { error: 'Facturama rechazo el CSD: ' + JSON.stringify(registro.error) }
+  }
 
   const cerEncrypted = encryptToBase64(cerBase64)
   const keyEncrypted = encryptToBase64(keyBase64)
