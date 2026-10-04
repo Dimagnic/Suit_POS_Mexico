@@ -139,7 +139,8 @@ export async function generarFactura(saleId: string, receptor?: ReceptorInput) {
     Items: cfdiItems,
   }
 
-  if (usarMultiemisor) {
+    if (usarMultiemisor) {
+    payload.Folio = String(Date.now())
     payload.Issuer = {
       Rfc: fiscalProfile.rfc,
       Name: fiscalProfile.razon_social,
