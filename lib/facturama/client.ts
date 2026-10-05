@@ -105,8 +105,8 @@ async function intentarDescarga(url: string, format: 'xml' | 'pdf') {
 
   const base64Content = data.Content ?? data.content ?? data.Xml ?? data.Pdf ?? data.xml ?? data.pdf ?? null
 
-    if (!base64Content) {
-    return { ok: false as const, error: `Sin contenido. Campos: ${Object.keys(data).join(', ')}` }
+     if (!base64Content) {
+    return { ok: false as const, error: `Sin contenido. Complement: ${JSON.stringify(data.Complement)}` }
   }
 
   return { ok: true as const, base64: base64Content as string }
