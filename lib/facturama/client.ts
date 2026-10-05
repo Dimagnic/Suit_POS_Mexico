@@ -99,21 +99,37 @@ async function intentarDescarga(url: string, format: 'xml' | 'pdf') {
     return { ok: false as const, error: `Respuesta no es JSON valido` }
   }
 
-    if (typeof data === 'string') {
+  if (typeof data === 'string') {
     return { ok: true as const, base64: data }
   }
 
   const base64Content = data.Content ?? data.content ?? data.Xml ?? data.Pdf ?? data.xml ?? data.pdf ?? null
 
-     if (!base64Content) {
+  if (!base64Content) {
     return { ok: false as const, error: `Sin contenido. Complement: ${JSON.stringify(data.Complement)}` }
   }
 
   return { ok: true as const, base64: base64Content as string }
 }
 
+async function obtenerUuidFiscal(cfdiId: string): Promise<string | null> {
+  const response = await fetch(`${FACTURAMA_URL}/api-lite/cfdis/${cfdiId}`, {
+    method: 'GET',
+    headers: { Authorization: getAuthHeader() },
+  })
+  if (!response.ok) return null
+  const data = await response.json().catch(() => null)
+  return data?.Complement?.TaxStamp?.Uuid ?? null
+}
+
 async function descargarArchivo(format: 'xml' | 'pdf', cfdiId: string) {
+  const uuid = await obtenerUuidFiscal(cfdiId)
+
   const intentos = [
+    ...(uuid ? [
+      `${FACTURAMA_URL}/api-lite/Cfdi/${format}/issued/${uuid}`,
+      `${FACTURAMA_URL}/Cfdi/${format}/issued/${uuid}`,
+    ] : []),
     `${FACTURAMA_URL}/api-lite/cfdis/${cfdiId}?type=${format}`,
     `${FACTURAMA_URL}/api-lite/Cfdi/${format}/issued/${cfdiId}`,
     `${FACTURAMA_URL}/Cfdi/${format}/issued/${cfdiId}`,
@@ -127,8 +143,10 @@ async function descargarArchivo(format: 'xml' | 'pdf', cfdiId: string) {
     errores.push(resultado.error)
   }
 
-  return { ok: false as const, error: `No se pudo descargar el ${format}. ${errores.join(' | ')}` }
-}export async function descargarXml(cfdiId: string) {
+  return { ok: false as const, error: `No se pudo descargar el ${format} (uuid: ${uuid ?? 'no encontrado'}). ${errores.join(' | ')}` }
+}
+
+export async function descargarXml(cfdiId: string) {
   return descargarArchivo('xml', cfdiId)
 }
 
