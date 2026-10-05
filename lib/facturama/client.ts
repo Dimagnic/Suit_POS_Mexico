@@ -70,7 +70,7 @@ export async function crearCfdiMultiemisor(payload: unknown) {
 }
 
 // Descarga el XML o PDF de un CFDI ya timbrado.
-async function intentarDescarga(url: string) {
+async function intentarDescarga(url: string, format: 'xml' | 'pdf') {
   const response = await fetch(url, {
     method: 'GET',
     headers: {
@@ -78,39 +78,53 @@ async function intentarDescarga(url: string) {
     },
   })
 
-  const rawText = await response.text()
-
   if (!response.ok) {
-    return { ok: false as const, status: response.status, error: `Error ${response.status} al descargar` }
+    return { ok: false as const, error: `Error ${response.status} al descargar` }
   }
+
+  const contentType = response.headers.get('content-type') ?? ''
+
+  // Si Facturama regresa el archivo crudo (no JSON), lo convertimos nosotros a base64
+  if (!contentType.includes('application/json')) {
+    const buffer = await response.arrayBuffer()
+    return { ok: true as const, base64: Buffer.from(buffer).toString('base64') }
+  }
+
+  const rawText = await response.text()
 
   let data: any
   try {
     data = JSON.parse(rawText)
   } catch {
-    return { ok: false as const, status: response.status, error: `Respuesta no es JSON valido` }
+    return { ok: false as const, error: `Respuesta no es JSON valido` }
   }
 
   const base64Content = data.Content ?? data.content ?? null
 
   if (!base64Content) {
-    return { ok: false as const, status: response.status, error: `Respuesta de Facturama sin contenido` }
+    return { ok: false as const, error: `Respuesta de Facturama sin contenido` }
   }
 
   return { ok: true as const, base64: base64Content as string }
 }
 
 async function descargarArchivo(format: 'xml' | 'pdf', cfdiId: string) {
-  const intento1 = await intentarDescarga(`${FACTURAMA_URL}/api-lite/Cfdi/${format}/issued/${cfdiId}`)
-  if (intento1.ok) return intento1
+  const intentos = [
+    `${FACTURAMA_URL}/api-lite/cfdis/${cfdiId}?type=${format}`,
+    `${FACTURAMA_URL}/api-lite/Cfdi/${format}/issued/${cfdiId}`,
+    `${FACTURAMA_URL}/Cfdi/${format}/issued/${cfdiId}`,
+  ]
 
-  const intento2 = await intentarDescarga(`${FACTURAMA_URL}/Cfdi/${format}/issued/${cfdiId}`)
-  if (intento2.ok) return intento2
+  const errores: string[] = []
 
-  return { ok: false as const, error: `No se pudo descargar el ${format}. Intento Multiemisor: ${intento1.error}. Intento API Web: ${intento2.error}` }
-}
+  for (const url of intentos) {
+    const resultado = await intentarDescarga(url, format)
+    if (resultado.ok) return resultado
+    errores.push(resultado.error)
+  }
 
-export async function descargarXml(cfdiId: string) {
+  return { ok: false as const, error: `No se pudo descargar el ${format}. ${errores.join(' | ')}` }
+}export async function descargarXml(cfdiId: string) {
   return descargarArchivo('xml', cfdiId)
 }
 
