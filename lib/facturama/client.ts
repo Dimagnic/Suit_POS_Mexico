@@ -99,10 +99,14 @@ async function intentarDescarga(url: string, format: 'xml' | 'pdf') {
     return { ok: false as const, error: `Respuesta no es JSON valido` }
   }
 
-  const base64Content = data.Content ?? data.content ?? null
+    if (typeof data === 'string') {
+    return { ok: true as const, base64: data }
+  }
+
+  const base64Content = data.Content ?? data.content ?? data.Xml ?? data.Pdf ?? data.xml ?? data.pdf ?? null
 
   if (!base64Content) {
-    return { ok: false as const, error: `Respuesta de Facturama sin contenido` }
+    return { ok: false as const, error: `Sin contenido. Respuesta: ${rawText.slice(0, 200)}` }
   }
 
   return { ok: true as const, base64: base64Content as string }
