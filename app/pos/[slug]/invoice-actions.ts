@@ -168,9 +168,9 @@ export async function generarFactura(saleId: string, receptor?: ReceptorInput) {
   const cfdiId = cfdi.Id ?? cfdi.Complement?.TaxStamp?.Uuid
 
   // Intentamos descargar XML y PDF, pero si falla no bloqueamos el timbrado ya exitoso
-  const [xmlResult, pdfResult] = await Promise.all([
-    descargarXml(cfdiId),
-    descargarPdf(cfdiId),
+    const [xmlResult, pdfResult] = await Promise.all([
+    descargarXml(cfdiId, usarMultiemisor),
+    descargarPdf(cfdiId, usarMultiemisor),
   ])
 
   const { error: insertError } = await supabase.from('invoices').insert({
