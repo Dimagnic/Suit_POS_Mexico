@@ -194,10 +194,12 @@ export async function generarFactura(saleId: string, receptor?: ReceptorInput) {
     return { error: 'Se timbro correctamente pero no se pudo guardar en la base de datos: ' + insertError.message }
   }
 
-  return {
+    return {
     success: true,
     uuid: cfdi.Id ?? cfdi.Complement?.TaxStamp?.Uuid,
     xmlBase64: xmlResult.ok ? xmlResult.base64 : null,
     pdfBase64: pdfResult.ok ? pdfResult.base64 : null,
+    xmlError: xmlResult.ok ? null : xmlResult.error,
+    pdfError: pdfResult.ok ? null : pdfResult.error,
   }
 }

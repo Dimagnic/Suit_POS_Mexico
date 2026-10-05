@@ -68,12 +68,14 @@ export default function PosClient({
   const [lastSaleItems, setLastSaleItems] = useState<CartLine[]>([])
 
   const [invoiceLoading, setInvoiceLoading] = useState(false)
-  const [invoiceResult, setInvoiceResult] = useState<{
+    const [invoiceResult, setInvoiceResult] = useState<{
     success?: boolean
     error?: string
     uuid?: string
     xmlBase64?: string | null
     pdfBase64?: string | null
+    xmlError?: string | null
+    pdfError?: string | null
   } | null>(null)
 
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
@@ -480,6 +482,12 @@ export default function PosClient({
                   </div>
                 </div>
               )}
+{!invoiceResult?.pdfBase64 && invoiceResult?.pdfError && (
+  <p style={{ color: 'var(--danger)', fontSize: '0.7rem', wordBreak: 'break-all' }}>PDF: {invoiceResult.pdfError}</p>
+)}
+{!invoiceResult?.xmlBase64 && invoiceResult?.xmlError && (
+  <p style={{ color: 'var(--danger)', fontSize: '0.7rem', wordBreak: 'break-all' }}>XML: {invoiceResult.xmlError}</p>
+)}
 
               {invoiceResult?.error && !showInvoiceModal && (
                 <p style={{ color: 'var(--danger)', fontSize: '0.85rem', marginTop: '0.5rem' }}>
