@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { X509Certificate } from 'crypto'
 import { encryptToBase64, encryptText } from '@/lib/crypto/csd'
-import { registrarCsd } from '@/lib/facturama/client'
+import { registrarCsd, consultarCsd } from '@/lib/facturama/client'
 import { revalidatePath } from 'next/cache'
 
 async function getCurrentUser() {
@@ -30,6 +30,23 @@ export async function getCsdStatus() {
     .maybeSingle()
 
   return { csd: data ?? null, role: current.role }
+}
+
+export async function consultarCsdRegistrado() {
+  const current = await getCurrentUser()
+  if (!current) return { error: 'No autenticado' }
+
+  const supabase = await createClient()
+  const { data: fiscalProfile } = await supabase
+    .from('fiscal_profiles')
+    .select('rfc')
+    .eq('organization_id', current.organization_id)
+    .single()
+
+  if (!fiscalProfile) return { error: 'No hay perfil fiscal configurado.' }
+
+  const resultado = await consultarCsd(fiscalProfile.rfc)
+  return { rfc: fiscalProfile.rfc, resultado }
 }
 
 export async function uploadCsd(cerBase64: string, keyBase64: string, password: string) {

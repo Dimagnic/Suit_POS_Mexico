@@ -107,3 +107,15 @@ export async function descargarXml(cfdiId: string) {
 export async function descargarPdf(cfdiId: string) {
   return descargarArchivo('pdf', cfdiId)
 }
+
+export async function consultarCsd(rfc: string) {
+  const response = await fetch(`${FACTURAMA_URL}/api-lite/csds/${rfc}`, {
+    method: 'GET',
+    headers: { Authorization: getAuthHeader() },
+  })
+  const data = await response.json().catch(() => null)
+  if (!response.ok) {
+    return { ok: false as const, error: data ?? `Error ${response.status} al consultar el CSD` }
+  }
+  return { ok: true as const, data }
+}

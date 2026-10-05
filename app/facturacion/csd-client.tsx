@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { uploadCsd } from './csd-actions'
+import { uploadCsd, consultarCsdRegistrado } from './csd-actions'
 
 type Csd = { id: string; valid_from: string | null; valid_until: string | null; created_at: string } | null
 
@@ -24,6 +24,15 @@ export default function CsdClient({ csd, role }: { csd: Csd; role: string }) {
   const [password, setPassword] = useState('')
   const [saving, setSaving] = useState(false)
   const [result, setResult] = useState<{ success?: boolean; error?: string; validFrom?: string | null; validUntil?: string | null } | null>(null)
+  const [consulta, setConsulta] = useState<any>(null)
+  const [consultando, setConsultando] = useState(false)
+
+  const handleConsultar = async () => {
+    setConsultando(true)
+    const res = await consultarCsdRegistrado()
+    setConsultando(false)
+    setConsulta(res)
+  }
 
   if (role !== 'owner') {
     return (
@@ -125,6 +134,28 @@ export default function CsdClient({ csd, role }: { csd: Csd; role: string }) {
         >
           {saving ? 'Guardando...' : csd ? 'Reemplazar CSD' : 'Guardar CSD'}
         </button>
+
+        <button
+          type="button"
+          onClick={handleConsultar}
+          disabled={consultando}
+          style={{
+            padding: '0.6rem',
+            background: 'transparent',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            color: 'var(--text-muted)',
+            cursor: consultando ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {consultando ? 'Consultando...' : '🔍 Consultar CSD registrado en Facturama'}
+        </button>
+
+        {consulta && (
+          <pre style={{ fontSize: '0.75rem', background: 'var(--bg)', padding: '0.75rem', borderRadius: 'var(--radius)', overflowX: 'auto', whiteSpace: 'pre-wrap' }}>
+            {JSON.stringify(consulta, null, 2)}
+          </pre>
+        )}
 
         {result?.error && (
           <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{result.error}</p>
