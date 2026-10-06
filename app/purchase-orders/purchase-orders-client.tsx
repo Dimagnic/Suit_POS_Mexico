@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useTransition } from 'react'
-import { createPurchaseOrder, markPurchaseOrderReceived, cancelPurchaseOrder } from './actions'
+import { useState, useTransition, useMemo } from 'react'
+import { createPurchaseOrder, markPurchaseOrderReceived, cancelPurchaseOrder, deletePurchaseOrder } from './actions'
 import { canEditCatalog, type Role } from '@/lib/permissions'
 
 type Supplier = { id: string; name: string }
@@ -16,6 +16,15 @@ type Order = {
   supplierName: string
   items: OrderItem[]
   total: number
+}
+
+type SortOption = 'newest' | 'oldest' | 'supplier_asc' | 'supplier_desc'
+
+const SORT_LABELS: Record<SortOption, string> = {
+  newest: 'Más reciente primero',
+  oldest: 'Más antiguo primero',
+  supplier_asc: 'Proveedor (A-Z)',
+  supplier_desc: 'Proveedor (Z-A)',
 }
 
 const inputStyle: React.CSSProperties = {
@@ -48,6 +57,7 @@ export default function PurchaseOrdersClient({
 }) {
   const canEdit = canEditCatalog(currentRole)
   const [rows, setRows] = useState(orders)
+  const [sortBy, setSortBy] = useState<SortOption>('newest')
   const [showNew, setShowNew] = useState(false)
   const [supplierId, setSupplierId] = useState('')
   const [notes, setNotes] = useState('')
@@ -55,6 +65,22 @@ export default function PurchaseOrdersClient({
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+
+  const sortedRows = useMemo(() => {
+    const copia = [...rows]
+    switch (sortBy) {
+      case 'newest':
+        return copia.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      case 'oldest':
+        return copia.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      case 'supplier_asc':
+        return copia.sort((a, b) => a.supplierName.localeCompare(b.supplierName, 'es'))
+      case 'supplier_desc':
+        return copia.sort((a, b) => b.supplierName.localeCompare(a.supplierName, 'es'))
+      default:
+        return copia
+    }
+  }, [rows, sortBy])
 
   function addDraftItem() {
     setDraftItems((prev) => [...prev, { productId: '', quantity: '1', unitCost: '' }])
@@ -136,6 +162,19 @@ export default function PurchaseOrdersClient({
     })
   }
 
+  function handleDelete(id: string, supplierName: string) {
+    const confirmado = window.confirm(`¿Eliminar la orden de "${supplierName}" permanentemente? Esta acción no se puede deshacer.`)
+    if (!confirmado) return
+    setErrorMsg(null)
+    setBusyId(id)
+    startTransition(async () => {
+      const result = await deletePurchaseOrder(id)
+      setBusyId(null)
+      if (result?.error) { setErrorMsg(result.error); return }
+      setRows((prev) => prev.filter((o) => o.id !== id))
+    })
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
       {errorMsg && (
@@ -144,59 +183,72 @@ export default function PurchaseOrdersClient({
         </div>
       )}
 
-      {canEdit && (
-        <div>
-          {!showNew ? (
-            <button onClick={() => setShowNew(true)} style={{ background: 'var(--accent)', color: 'var(--bg)', border: 'none', borderRadius: 'var(--radius)', padding: '0.5rem 1rem', fontWeight: 600, cursor: 'pointer', fontSize: '0.85rem' }}>
-              + Nueva orden de compra
-            </button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+        {canEdit && (
+          <div>
+            {!showNew ? (
+              <button onClick={() => setShowNew(true)} style={{ background: 'var(--accent)', color: 'var(--bg)', border: 'none', borderRadius: 'var(--radius)', padding: '0.5rem 1rem', fontWeight: 600, cursor: 'pointer', fontSize: '0.85rem' }}>
+                + Nueva orden de compra
+              </button>
+            ) : null}
+          </div>
+        )}
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+          Ordenar por:
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortOption)} style={inputStyle}>
+            {Object.entries(SORT_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {canEdit && showNew && (
+        <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 'var(--space-3)' }}>
+          {suppliers.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+              Primero necesitas dar de alta un proveedor en <a href="/suppliers" style={{ color: 'var(--accent)' }}>/suppliers</a>.
+            </p>
           ) : (
-            <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 'var(--space-3)' }}>
-              {suppliers.length === 0 ? (
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                  Primero necesitas dar de alta un proveedor en <a href="/suppliers" style={{ color: 'var(--accent)' }}>/suppliers</a>.
-                </p>
-              ) : (
-                <>
-                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} style={{ ...inputStyle, minWidth: '200px' }}>
-                      <option value="">Elige un proveedor</option>
-                      {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            <>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} style={{ ...inputStyle, minWidth: '200px' }}>
+                  <option value="">Elige un proveedor</option>
+                  {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+                <input placeholder="Notas (opcional)" value={notes} onChange={(e) => setNotes(e.target.value)} style={{ ...inputStyle, flex: '1 1 200px' }} />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {draftItems.map((item, idx) => (
+                  <div key={idx} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <select value={item.productId} onChange={(e) => updateDraftItem(idx, 'productId', e.target.value)} style={{ ...inputStyle, flex: '1 1 220px' }}>
+                      <option value="">Elige un producto</option>
+                      {products.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.giroNombre})</option>)}
                     </select>
-                    <input placeholder="Notas (opcional)" value={notes} onChange={(e) => setNotes(e.target.value)} style={{ ...inputStyle, flex: '1 1 200px' }} />
+                    <input type="number" step="0.01" placeholder="Cantidad" value={item.quantity} onChange={(e) => updateDraftItem(idx, 'quantity', e.target.value)} style={{ ...inputStyle, width: '100px' }} />
+                    <input type="number" step="0.01" placeholder="Costo unit." value={item.unitCost} onChange={(e) => updateDraftItem(idx, 'unitCost', e.target.value)} style={{ ...inputStyle, width: '110px' }} />
+                    <button type="button" onClick={() => removeDraftItem(idx)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '0.4rem 0.6rem', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.8rem' }}>✕</button>
                   </div>
+                ))}
+                <button type="button" onClick={addDraftItem} style={{ alignSelf: 'flex-start', background: 'transparent', border: '1px dashed var(--border)', borderRadius: 'var(--radius)', padding: '0.4rem 0.75rem', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.8rem' }}>
+                  + Agregar producto
+                </button>
+              </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {draftItems.map((item, idx) => (
-                      <div key={idx} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <select value={item.productId} onChange={(e) => updateDraftItem(idx, 'productId', e.target.value)} style={{ ...inputStyle, flex: '1 1 220px' }}>
-                          <option value="">Elige un producto</option>
-                          {products.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.giroNombre})</option>)}
-                        </select>
-                        <input type="number" step="0.01" placeholder="Cantidad" value={item.quantity} onChange={(e) => updateDraftItem(idx, 'quantity', e.target.value)} style={{ ...inputStyle, width: '100px' }} />
-                        <input type="number" step="0.01" placeholder="Costo unit." value={item.unitCost} onChange={(e) => updateDraftItem(idx, 'unitCost', e.target.value)} style={{ ...inputStyle, width: '110px' }} />
-                        <button type="button" onClick={() => removeDraftItem(idx)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '0.4rem 0.6rem', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.8rem' }}>✕</button>
-                      </div>
-                    ))}
-                    <button type="button" onClick={addDraftItem} style={{ alignSelf: 'flex-start', background: 'transparent', border: '1px dashed var(--border)', borderRadius: 'var(--radius)', padding: '0.4rem 0.75rem', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.8rem' }}>
-                      + Agregar producto
-                    </button>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button type="submit" disabled={isPending} style={{ background: 'var(--accent)', color: 'var(--bg)', border: 'none', borderRadius: 'var(--radius)', padding: '0.5rem 1rem', fontWeight: 600, cursor: 'pointer' }}>Crear orden</button>
-                    <button type="button" onClick={() => setShowNew(false)} style={{ background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '0.5rem 1rem', cursor: 'pointer' }}>Cancelar</button>
-                  </div>
-                </>
-              )}
-            </form>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button type="submit" disabled={isPending} style={{ background: 'var(--accent)', color: 'var(--bg)', border: 'none', borderRadius: 'var(--radius)', padding: '0.5rem 1rem', fontWeight: 600, cursor: 'pointer' }}>Crear orden</button>
+                <button type="button" onClick={() => setShowNew(false)} style={{ background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '0.5rem 1rem', cursor: 'pointer' }}>Cancelar</button>
+              </div>
+            </>
           )}
-        </div>
+        </form>
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-        {rows.length === 0 && <p style={{ color: 'var(--text-muted)' }}>Sin órdenes de compra todavía.</p>}
-        {rows.map((o) => (
+        {sortedRows.length === 0 && <p style={{ color: 'var(--text-muted)' }}>Sin órdenes de compra todavía.</p>}
+        {sortedRows.map((o) => (
           <div key={o.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderLeft: `3px solid ${STATUS_COLORS[o.status]}`, borderRadius: 'var(--radius)', padding: 'var(--space-2)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
               <div>
@@ -217,6 +269,11 @@ export default function PurchaseOrdersClient({
                       Cancelar
                     </button>
                   </>
+                )}
+                {canEdit && o.status !== 'received' && (
+                  <button onClick={() => handleDelete(o.id, o.supplierName)} disabled={isPending && busyId === o.id} style={{ background: 'transparent', border: '1px solid var(--danger)', borderRadius: 'var(--radius)', padding: '0.4rem 0.75rem', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.8rem' }}>
+                    Eliminar
+                  </button>
                 )}
               </div>
             </div>

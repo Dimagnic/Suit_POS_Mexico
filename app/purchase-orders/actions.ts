@@ -20,7 +20,7 @@ export async function getPurchaseOrdersPageData() {
   const supabase = await createClient()
   const current = await getCurrentUser()
   if (!current) return { error: 'No autenticado' }
-  if (!canEditCatalog(current.role as Role)) return { error: 'No tienes permiso para ver órdenes de compra.' }
+  if (!canEditCatalog(current.role as Role)) return { error: 'No tienes permiso para ver ordenes de compra.' }
 
   const { data: orders, error } = await supabase
     .from('purchase_orders')
@@ -81,14 +81,14 @@ export async function createPurchaseOrder(supplierId: string, items: NewItem[], 
   const supabase = await createClient()
   const current = await getCurrentUser()
   if (!current) return { error: 'No autenticado' }
-  if (!canEditCatalog(current.role as Role)) return { error: 'No tienes permiso para crear órdenes de compra.' }
+  if (!canEditCatalog(current.role as Role)) return { error: 'No tienes permiso para crear ordenes de compra.' }
 
   if (!supplierId) return { error: 'Elige un proveedor.' }
   if (items.length === 0) return { error: 'Agrega al menos un producto.' }
 
   const { data: supplier } = await supabase.from('suppliers').select('organization_id').eq('id', supplierId).single()
   if (!supplier || supplier.organization_id !== current.organization_id) {
-    return { error: 'Ese proveedor no pertenece a tu organización.' }
+    return { error: 'Ese proveedor no pertenece a tu organizacion.' }
   }
 
   const { data: order, error: orderError } = await supabase
@@ -123,7 +123,7 @@ export async function markPurchaseOrderReceived(purchaseOrderId: string) {
   const supabase = await createClient()
   const current = await getCurrentUser()
   if (!current) return { error: 'No autenticado' }
-  if (!canEditCatalog(current.role as Role)) return { error: 'No tienes permiso para recibir órdenes de compra.' }
+  if (!canEditCatalog(current.role as Role)) return { error: 'No tienes permiso para recibir ordenes de compra.' }
 
   const { data: order } = await supabase
     .from('purchase_orders')
@@ -132,7 +132,7 @@ export async function markPurchaseOrderReceived(purchaseOrderId: string) {
     .single()
 
   if (!order || order.organization_id !== current.organization_id) {
-    return { error: 'Esa orden no pertenece a tu organización.' }
+    return { error: 'Esa orden no pertenece a tu organizacion.' }
   }
   if (order.status === 'received') {
     return { error: 'Esa orden ya fue marcada como recibida.' }
@@ -171,17 +171,41 @@ export async function cancelPurchaseOrder(purchaseOrderId: string) {
   const supabase = await createClient()
   const current = await getCurrentUser()
   if (!current) return { error: 'No autenticado' }
-  if (!canEditCatalog(current.role as Role)) return { error: 'No tienes permiso para cancelar órdenes de compra.' }
+  if (!canEditCatalog(current.role as Role)) return { error: 'No tienes permiso para cancelar ordenes de compra.' }
 
   const { data: order } = await supabase.from('purchase_orders').select('organization_id, status').eq('id', purchaseOrderId).single()
   if (!order || order.organization_id !== current.organization_id) {
-    return { error: 'Esa orden no pertenece a tu organización.' }
+    return { error: 'Esa orden no pertenece a tu organizacion.' }
   }
   if (order.status === 'received') {
     return { error: 'No puedes cancelar una orden ya recibida.' }
   }
 
   const { error } = await supabase.from('purchase_orders').update({ status: 'canceled' }).eq('id', purchaseOrderId)
+  if (error) return { error: error.message }
+
+  revalidatePath('/purchase-orders')
+  return { success: true }
+}
+
+export async function deletePurchaseOrder(purchaseOrderId: string) {
+  const supabase = await createClient()
+  const current = await getCurrentUser()
+  if (!current) return { error: 'No autenticado' }
+  if (!canEditCatalog(current.role as Role)) return { error: 'No tienes permiso para eliminar ordenes de compra.' }
+
+  const { data: order } = await supabase.from('purchase_orders').select('organization_id, status').eq('id', purchaseOrderId).single()
+  if (!order || order.organization_id !== current.organization_id) {
+    return { error: 'Esa orden no pertenece a tu organizacion.' }
+  }
+  if (order.status === 'received') {
+    return { error: 'No puedes eliminar una orden ya recibida (afectaria tu historial de inventario). Si fue un error, contacta soporte.' }
+  }
+
+  const { error: itemsError } = await supabase.from('purchase_order_items').delete().eq('purchase_order_id', purchaseOrderId)
+  if (itemsError) return { error: itemsError.message }
+
+  const { error } = await supabase.from('purchase_orders').delete().eq('id', purchaseOrderId)
   if (error) return { error: error.message }
 
   revalidatePath('/purchase-orders')
