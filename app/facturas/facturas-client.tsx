@@ -67,7 +67,8 @@ export default function FacturasClient() {
   async function cargar() {
     setLoading(true)
     setError('')
-    const resultado = await listarFacturas({ page, status: statusFiltro || undefined, folio: folioFiltro || undefined })
+        const statusReal = statusFiltro.startsWith('__manual__') ? statusFiltro.replace('__manual__', '') : statusFiltro
+    const resultado = await listarFacturas({ page, status: statusReal || undefined, folio: folioFiltro || undefined })
     if (resultado.error) {
       setError(resultado.error)
       setRows([])
@@ -169,12 +170,18 @@ export default function FacturasClient() {
       </div>
 
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', margin: '16px 0', flexWrap: 'wrap' }}>
-        <select value={statusFiltro} onChange={(e) => setStatusFiltro(e.target.value)}>
+                <select value={statusFiltro} onChange={(e) => setStatusFiltro(e.target.value)}>
           <option value="">Todos los estados</option>
           <option value="active">Activa</option>
           <option value="canceled">Cancelada</option>
           <option value="pending">Pendiente de cancelacion</option>
         </select>
+        <input
+          placeholder="Status manual de prueba (anula el de arriba)"
+          value={statusFiltro.startsWith('__manual__') ? statusFiltro.replace('__manual__', '') : ''}
+          onChange={(e) => setStatusFiltro('__manual__' + e.target.value)}
+          style={{ padding: 6, minWidth: 220 }}
+        />
         <input
           placeholder="Buscar por folio"
           value={folioFiltro}
