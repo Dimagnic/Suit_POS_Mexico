@@ -99,7 +99,7 @@ export async function getProductsForGiro(giroSlug: string) {
 
   const { data: products, error } = await supabase
     .from('products')
-    .select('id, sku, name, price, cost, stock_quantity, unit, category, duration_minutes, is_active')
+    .select('id, sku, name, price, cost, stock_quantity, unit, category, duration_minutes, is_active, created_at')
     .eq('organization_id', current.organization_id)
     .eq('giro_id', giro.id)
     .order('name')
@@ -124,7 +124,7 @@ export async function createProduct(giroId: string, input: ProductInput) {
   const supabase = await createClient()
   const current = await getCurrentUser()
   if (!current) return { error: 'No autenticado' }
-  if (!canEditCatalog(current.role as Role)) return { error: 'No tienes permiso para editar el catálogo.' }
+  if (!canEditCatalog(current.role as Role)) return { error: 'No tienes permiso para editar el catalogo.' }
 
   if (!input.name.trim()) return { error: 'El nombre es obligatorio.' }
 
@@ -139,7 +139,7 @@ export async function createProduct(giroId: string, input: ProductInput) {
     if (duplicado.tipo === 'nombre') {
       return { error: `Ya existe un producto llamado "${duplicado.producto.name}" en este giro.` }
     }
-    return { error: `El SKU "${duplicado.producto.sku}" ya está en uso por "${duplicado.producto.name}".` }
+    return { error: `El SKU "${duplicado.producto.sku}" ya esta en uso por "${duplicado.producto.name}".` }
   }
 
   const { data, error } = await supabase
@@ -169,11 +169,11 @@ export async function updateProduct(productId: string, input: ProductInput) {
   const supabase = await createClient()
   const current = await getCurrentUser()
   if (!current) return { error: 'No autenticado' }
-  if (!canEditCatalog(current.role as Role)) return { error: 'No tienes permiso para editar el catálogo.' }
+  if (!canEditCatalog(current.role as Role)) return { error: 'No tienes permiso para editar el catalogo.' }
 
   const { data: target } = await supabase.from('products').select('organization_id, giro_id').eq('id', productId).single()
   if (!target || target.organization_id !== current.organization_id) {
-    return { error: 'Ese producto no pertenece a tu organización.' }
+    return { error: 'Ese producto no pertenece a tu organizacion.' }
   }
 
   const duplicado = await existeProductoDuplicado(
@@ -188,7 +188,7 @@ export async function updateProduct(productId: string, input: ProductInput) {
     if (duplicado.tipo === 'nombre') {
       return { error: `Ya existe un producto llamado "${duplicado.producto.name}" en este giro.` }
     }
-    return { error: `El SKU "${duplicado.producto.sku}" ya está en uso por "${duplicado.producto.name}".` }
+    return { error: `El SKU "${duplicado.producto.sku}" ya esta en uso por "${duplicado.producto.name}".` }
   }
 
   const { error } = await supabase
@@ -213,15 +213,37 @@ export async function toggleProductActive(productId: string, active: boolean) {
   const supabase = await createClient()
   const current = await getCurrentUser()
   if (!current) return { error: 'No autenticado' }
-  if (!canEditCatalog(current.role as Role)) return { error: 'No tienes permiso para editar el catálogo.' }
+  if (!canEditCatalog(current.role as Role)) return { error: 'No tienes permiso para editar el catalogo.' }
 
   const { data: target } = await supabase.from('products').select('organization_id').eq('id', productId).single()
   if (!target || target.organization_id !== current.organization_id) {
-    return { error: 'Ese producto no pertenece a tu organización.' }
+    return { error: 'Ese producto no pertenece a tu organizacion.' }
   }
 
   const { error } = await supabase.from('products').update({ is_active: active }).eq('id', productId)
   if (error) return { error: error.message }
+  revalidatePath('/products')
+  return { success: true }
+}
+
+export async function deleteProduct(productId: string) {
+  const supabase = await createClient()
+  const current = await getCurrentUser()
+  if (!current) return { error: 'No autenticado' }
+  if (!canEditCatalog(current.role as Role)) return { error: 'No tienes permiso para editar el catalogo.' }
+
+  const { data: target } = await supabase.from('products').select('organization_id').eq('id', productId).single()
+  if (!target || target.organization_id !== current.organization_id) {
+    return { error: 'Ese producto no pertenece a tu organizacion.' }
+  }
+
+  const { error } = await supabase.from('products').delete().eq('id', productId)
+  if (error) {
+    if (error.code === '23503') {
+      return { error: 'No se puede eliminar: este producto ya tiene ventas u otros registros asociados. Puedes desactivarlo en su lugar.' }
+    }
+    return { error: error.message }
+  }
   revalidatePath('/products')
   return { success: true }
 }
