@@ -46,7 +46,23 @@ export default function FacturasClient() {
   const [reenviarError, setReenviarError] = useState('')
   const [reenviarOk, setReenviarOk] = useState(false)
 
-  const [descargando, setDescargando] = useState<string | null>(null)
+    const [descargando, setDescargando] = useState<string | null>(null)
+
+  const [consultaId, setConsultaId] = useState('')
+  const [consultaResultado, setConsultaResultado] = useState<any>(null)
+  const [consultaError, setConsultaError] = useState('')
+
+  async function consultarPorId() {
+    setConsultaError('')
+    setConsultaResultado(null)
+    if (!consultaId.trim()) { setConsultaError('Pon un Id.'); return }
+    const resultado = await obtenerDetalleFactura(consultaId.trim())
+    if (resultado.error) {
+      setConsultaError(typeof resultado.error === 'string' ? resultado.error : JSON.stringify(resultado.error))
+    } else {
+      setConsultaResultado(resultado.data)
+    }
+  }
 
   async function cargar() {
     setLoading(true)
@@ -137,6 +153,20 @@ export default function FacturasClient() {
   return (
     <div style={{ padding: 24, maxWidth: 1100, margin: '0 auto' }}>
       <h1>Facturas</h1>
+
+           <div style={{ margin: '16px 0', padding: 12, border: '1px solid #444', borderRadius: 6 }}>
+        <p style={{ margin: '0 0 8px 0' }}><strong>Diagnostico: consultar una factura por su Id interno</strong> (el campo "Id" del JSON, no el Folio)</p>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input placeholder="Id de la factura" value={consultaId} onChange={(e) => setConsultaId(e.target.value)} style={{ flex: 1, padding: 6 }} />
+          <button onClick={consultarPorId}>Consultar</button>
+        </div>
+        {consultaError && <p style={{ color: 'crimson' }}>{consultaError}</p>}
+        {consultaResultado && (
+          <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12, background: '#1e1e1e', color: '#e5e5e5', padding: 8, marginTop: 8 }}>
+            {JSON.stringify(consultaResultado, null, 2)}
+          </pre>
+        )}
+      </div>
 
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', margin: '16px 0', flexWrap: 'wrap' }}>
         <select value={statusFiltro} onChange={(e) => setStatusFiltro(e.target.value)}>
