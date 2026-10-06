@@ -177,7 +177,7 @@ export default function FacturasClient() {
               const folio = campo(row, 'Folio', 'folio') ?? ''
               const fecha = campo(row, 'Date', 'date', 'CreationDate') ?? ''
               const receptor = campo(row, 'Receiver', 'receiver') ?? {}
-              const receptorNombre = receptor?.Name ?? receptor?.name ?? campo(row, 'TaxEntityName', 'rfc') ?? '-'
+              const receptorNombre = receptor?.Name ?? receptor?.name ?? campo(row, 'TaxName', 'TaxEntityName', 'rfc') ?? '-'
               const total = campo(row, 'Total', 'total') ?? ''
               const status = campo(row, 'Status', 'status') ?? ''
               return (
@@ -215,8 +215,8 @@ export default function FacturasClient() {
               if (verCrudo === id) {
                 acc.push(
                   <tr key={`${id}-json`}>
-                    <td colSpan={6} style={{ padding: 8, background: '#f7f7f7' }}>
-                      <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>{JSON.stringify(row, null, 2)}</pre>
+                                        <td colSpan={6} style={{ padding: 8, background: '#1e1e1e' }}>
+                      <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12, color: '#e5e5e5' }}>{JSON.stringify(row, null, 2)}</pre>
                     </td>
                   </tr>
                 )
@@ -304,7 +304,7 @@ const modalOverlay: React.CSSProperties = {
   display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50,
 }
 const modalBox: React.CSSProperties = {
-  background: 'white', padding: 24, borderRadius: 8, width: '90%', maxWidth: 600,
+  background: 'white', color: '#111827', padding: 24, borderRadius: 8, width: '90%', maxWidth: 600,
   maxHeight: '85vh', overflow: 'auto', position: 'relative',
 }
 const closeBtn: React.CSSProperties = {
