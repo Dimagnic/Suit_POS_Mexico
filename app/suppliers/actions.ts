@@ -23,7 +23,7 @@ export async function getSuppliers() {
 
   const { data, error } = await supabase
     .from('suppliers')
-    .select('id, name, contact_name, phone, email, notes, is_active')
+    .select('id, name, contact_name, phone, email, notes, is_active, created_at')
     .eq('organization_id', current.organization_id)
     .order('name')
 
@@ -74,7 +74,7 @@ export async function updateSupplier(supplierId: string, input: SupplierInput) {
 
   const { data: target } = await supabase.from('suppliers').select('organization_id').eq('id', supplierId).single()
   if (!target || target.organization_id !== current.organization_id) {
-    return { error: 'Ese proveedor no pertenece a tu organización.' }
+    return { error: 'Ese proveedor no pertenece a tu organizacion.' }
   }
 
   const { error } = await supabase
@@ -101,11 +101,33 @@ export async function toggleSupplierActive(supplierId: string, active: boolean) 
 
   const { data: target } = await supabase.from('suppliers').select('organization_id').eq('id', supplierId).single()
   if (!target || target.organization_id !== current.organization_id) {
-    return { error: 'Ese proveedor no pertenece a tu organización.' }
+    return { error: 'Ese proveedor no pertenece a tu organizacion.' }
   }
 
   const { error } = await supabase.from('suppliers').update({ is_active: active }).eq('id', supplierId)
   if (error) return { error: error.message }
+  revalidatePath('/suppliers')
+  return { success: true }
+}
+
+export async function deleteSupplier(supplierId: string) {
+  const supabase = await createClient()
+  const current = await getCurrentUser()
+  if (!current) return { error: 'No autenticado' }
+  if (!canEditCatalog(current.role as Role)) return { error: 'No tienes permiso para editar proveedores.' }
+
+  const { data: target } = await supabase.from('suppliers').select('organization_id').eq('id', supplierId).single()
+  if (!target || target.organization_id !== current.organization_id) {
+    return { error: 'Ese proveedor no pertenece a tu organizacion.' }
+  }
+
+  const { error } = await supabase.from('suppliers').delete().eq('id', supplierId)
+  if (error) {
+    if (error.code === '23503') {
+      return { error: 'No se puede eliminar: este proveedor ya tiene ordenes de compra asociadas. Puedes desactivarlo en su lugar.' }
+    }
+    return { error: error.message }
+  }
   revalidatePath('/suppliers')
   return { success: true }
 }

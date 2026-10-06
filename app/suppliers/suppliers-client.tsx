@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useTransition } from 'react'
-import { createSupplier, updateSupplier, toggleSupplierActive } from './actions'
+import { useState, useTransition, useMemo } from 'react'
+import { createSupplier, updateSupplier, toggleSupplierActive, deleteSupplier } from './actions'
 import { canEditCatalog, type Role } from '@/lib/permissions'
 
 type Supplier = {
@@ -12,6 +12,16 @@ type Supplier = {
   email: string | null
   notes: string | null
   is_active: boolean
+  created_at: string
+}
+
+type SortOption = 'name_asc' | 'name_desc' | 'newest' | 'oldest'
+
+const SORT_LABELS: Record<SortOption, string> = {
+  name_asc: 'Nombre (A-Z)',
+  name_desc: 'Nombre (Z-A)',
+  newest: 'Más reciente primero',
+  oldest: 'Más antiguo primero',
 }
 
 const emptyForm = { name: '', contactName: '', phone: '', email: '', notes: '' }
@@ -24,12 +34,29 @@ const inputStyle: React.CSSProperties = {
 export default function SuppliersClient({ suppliers, currentRole }: { suppliers: Supplier[]; currentRole: Role }) {
   const canEdit = canEditCatalog(currentRole)
   const [rows, setRows] = useState(suppliers)
+  const [sortBy, setSortBy] = useState<SortOption>('name_asc')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [newForm, setNewForm] = useState(emptyForm)
   const [showNew, setShowNew] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+
+  const sortedRows = useMemo(() => {
+    const copia = [...rows]
+    switch (sortBy) {
+      case 'name_asc':
+        return copia.sort((a, b) => a.name.localeCompare(b.name, 'es'))
+      case 'name_desc':
+        return copia.sort((a, b) => b.name.localeCompare(a.name, 'es'))
+      case 'newest':
+        return copia.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      case 'oldest':
+        return copia.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      default:
+        return copia
+    }
+  }, [rows, sortBy])
 
   function startEdit(s: Supplier) {
     setEditingId(s.id)
@@ -58,6 +85,17 @@ export default function SuppliersClient({ suppliers, currentRole }: { suppliers:
     })
   }
 
+  function handleDelete(id: string, name: string) {
+    const confirmado = window.confirm(`¿Eliminar "${name}" permanentemente? Esta acción no se puede deshacer.`)
+    if (!confirmado) return
+    setErrorMsg(null)
+    startTransition(async () => {
+      const result = await deleteSupplier(id)
+      if (result?.error) { setErrorMsg(result.error); return }
+      setRows((prev) => prev.filter((s) => s.id !== id))
+    })
+  }
+
   function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     setErrorMsg(null)
@@ -68,6 +106,7 @@ export default function SuppliersClient({ suppliers, currentRole }: { suppliers:
       setRows((prev) => [...prev, {
         id: result.id, name: newForm.name, contact_name: newForm.contactName || null, phone: newForm.phone || null,
         email: newForm.email || null, notes: newForm.notes || null, is_active: true,
+        created_at: new Date().toISOString(),
       }])
       setNewForm(emptyForm)
       setShowNew(false)
@@ -82,29 +121,42 @@ export default function SuppliersClient({ suppliers, currentRole }: { suppliers:
         </div>
       )}
 
-      {canEdit && (
-        <div>
-          {!showNew ? (
-            <button onClick={() => setShowNew(true)} style={{ background: 'var(--accent)', color: 'var(--bg)', border: 'none', borderRadius: 'var(--radius)', padding: '0.5rem 1rem', fontWeight: 600, cursor: 'pointer', fontSize: '0.85rem' }}>
-              + Nuevo proveedor
-            </button>
-          ) : (
-            <form onSubmit={handleCreate} style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 'var(--space-2)' }}>
-              <input placeholder="Nombre del proveedor" value={newForm.name} onChange={(e) => setNewForm({ ...newForm, name: e.target.value })} style={{ ...inputStyle, flex: '1 1 180px' }} />
-              <input placeholder="Contacto" value={newForm.contactName} onChange={(e) => setNewForm({ ...newForm, contactName: e.target.value })} style={{ ...inputStyle, width: '150px' }} />
-              <input placeholder="Teléfono" value={newForm.phone} onChange={(e) => setNewForm({ ...newForm, phone: e.target.value })} style={{ ...inputStyle, width: '140px' }} />
-              <input placeholder="Correo" value={newForm.email} onChange={(e) => setNewForm({ ...newForm, email: e.target.value })} style={{ ...inputStyle, width: '180px' }} />
-              <input placeholder="Notas" value={newForm.notes} onChange={(e) => setNewForm({ ...newForm, notes: e.target.value })} style={{ ...inputStyle, flex: '1 1 150px' }} />
-              <button type="submit" disabled={isPending} style={{ background: 'var(--accent)', color: 'var(--bg)', border: 'none', borderRadius: 'var(--radius)', padding: '0.5rem 1rem', fontWeight: 600, cursor: 'pointer' }}>Guardar</button>
-              <button type="button" onClick={() => setShowNew(false)} style={{ background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '0.5rem 1rem', cursor: 'pointer' }}>Cancelar</button>
-            </form>
-          )}
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+        {canEdit && (
+          <div>
+            {!showNew ? (
+              <button onClick={() => setShowNew(true)} style={{ background: 'var(--accent)', color: 'var(--bg)', border: 'none', borderRadius: 'var(--radius)', padding: '0.5rem 1rem', fontWeight: 600, cursor: 'pointer', fontSize: '0.85rem' }}>
+                + Nuevo proveedor
+              </button>
+            ) : null}
+          </div>
+        )}
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+          Ordenar por:
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortOption)} style={inputStyle}>
+            {Object.entries(SORT_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {canEdit && showNew && (
+        <form onSubmit={handleCreate} style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 'var(--space-2)' }}>
+          <input placeholder="Nombre del proveedor" value={newForm.name} onChange={(e) => setNewForm({ ...newForm, name: e.target.value })} style={{ ...inputStyle, flex: '1 1 180px' }} />
+          <input placeholder="Contacto" value={newForm.contactName} onChange={(e) => setNewForm({ ...newForm, contactName: e.target.value })} style={{ ...inputStyle, width: '150px' }} />
+          <input placeholder="Teléfono" value={newForm.phone} onChange={(e) => setNewForm({ ...newForm, phone: e.target.value })} style={{ ...inputStyle, width: '140px' }} />
+          <input placeholder="Correo" value={newForm.email} onChange={(e) => setNewForm({ ...newForm, email: e.target.value })} style={{ ...inputStyle, width: '180px' }} />
+          <input placeholder="Notas" value={newForm.notes} onChange={(e) => setNewForm({ ...newForm, notes: e.target.value })} style={{ ...inputStyle, flex: '1 1 150px' }} />
+          <button type="submit" disabled={isPending} style={{ background: 'var(--accent)', color: 'var(--bg)', border: 'none', borderRadius: 'var(--radius)', padding: '0.5rem 1rem', fontWeight: 600, cursor: 'pointer' }}>Guardar</button>
+          <button type="button" onClick={() => setShowNew(false)} style={{ background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '0.5rem 1rem', cursor: 'pointer' }}>Cancelar</button>
+        </form>
       )}
 
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
-        {rows.length === 0 && <p style={{ padding: 'var(--space-2)', color: 'var(--text-muted)' }}>Sin proveedores todavía.</p>}
-        {rows.map((s, idx) => (
+        {sortedRows.length === 0 && <p style={{ padding: 'var(--space-2)', color: 'var(--text-muted)' }}>Sin proveedores todavía.</p>}
+        {sortedRows.map((s, idx) => (
           <div key={s.id} style={{ padding: 'var(--space-2)', borderTop: idx === 0 ? 'none' : '1px solid var(--border)', borderLeft: s.is_active ? '3px solid var(--accent)' : '3px solid var(--text-muted)', opacity: s.is_active ? 1 : 0.5 }}>
             {editingId === s.id ? (
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -128,6 +180,9 @@ export default function SuppliersClient({ suppliers, currentRole }: { suppliers:
                     <button onClick={() => startEdit(s)} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '0.4rem 0.75rem', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.8rem' }}>Editar</button>
                     <button onClick={() => handleToggle(s.id, !s.is_active)} disabled={isPending} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '0.4rem 0.75rem', color: s.is_active ? 'var(--danger)' : 'var(--success)', cursor: 'pointer', fontSize: '0.8rem' }}>
                       {s.is_active ? 'Desactivar' : 'Activar'}
+                    </button>
+                    <button onClick={() => handleDelete(s.id, s.name)} disabled={isPending} style={{ background: 'transparent', border: '1px solid var(--danger)', borderRadius: 'var(--radius)', padding: '0.4rem 0.75rem', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.8rem' }}>
+                      Eliminar
                     </button>
                   </div>
                 )}
