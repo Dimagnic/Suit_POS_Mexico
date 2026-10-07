@@ -30,7 +30,7 @@ export default function FacturasClient() {
   const [error, setError] = useState('')
   const [statusFiltro, setStatusFiltro] = useState('')
   const [folioFiltro, setFolioFiltro] = useState('')
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useState(0)
 
   const [detalle, setDetalle] = useState<any>(null)
   const [detalleCargando, setDetalleCargando] = useState(false)
@@ -265,8 +265,8 @@ export default function FacturasClient() {
       )}
 
       <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
-        <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Anterior</button>
-        <span>Pagina {page}</span>
+      <button disabled={page <= 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>Anterior</button>
+                <span>Pagina {page + 1}</span>
         <button onClick={() => setPage((p) => p + 1)}>Siguiente</button>
       </div>
 
