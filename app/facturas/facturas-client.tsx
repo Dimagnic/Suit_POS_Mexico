@@ -64,11 +64,12 @@ export default function FacturasClient() {
     }
   }
 
-  async function cargar() {
+    async function cargar(pageOverride?: number) {
     setLoading(true)
     setError('')
-        const statusReal = statusFiltro.startsWith('__manual__') ? statusFiltro.replace('__manual__', '') : statusFiltro
-    const resultado = await listarFacturas({ page, status: statusReal || undefined, folio: folioFiltro || undefined })
+    const paginaActual = pageOverride ?? page
+    const statusReal = statusFiltro.startsWith('__manual__') ? statusFiltro.replace('__manual__', '') : statusFiltro
+    const resultado = await listarFacturas({ page: paginaActual, status: statusReal || undefined, folio: folioFiltro || undefined })
     if (resultado.error) {
       setError(resultado.error)
       setRows([])
@@ -188,7 +189,7 @@ export default function FacturasClient() {
           onChange={(e) => setFolioFiltro(e.target.value)}
           style={{ padding: 6 }}
         />
-        <button onClick={() => { setPage(1); cargar() }}>Buscar</button>
+               <button onClick={() => { setPage(0); cargar(0) }}>Buscar</button>
       </div>
 
       {loading && <p>Cargando facturas...</p>}
