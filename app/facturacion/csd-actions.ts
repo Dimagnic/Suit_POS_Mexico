@@ -29,7 +29,75 @@ export async function getCsdStatus() {
     .eq('organization_id', current.organization_id)
     .maybeSingle()
 
-  return { csd: data ?? null, role: current.role }
+  const { data: fiscalProfile } = await supabase
+    .from('fiscal_profiles')
+    .select('rfc, razon_social, regimen_fiscal, codigo_postal, uso_cfdi_default')
+    .eq('organization_id', current.organization_id)
+    .maybeSingle()
+
+  return { csd: data ?? null, fiscalProfile: fiscalProfile ?? null, role: current.role }
+}
+
+export async function guardarPerfilFiscal(input: {
+  rfc: string
+  razonSocial: string
+  regimenFiscal: string
+  codigoPostal: string
+  usoCfdiDefault: string
+}) {
+  const current = await getCurrentUser()
+  if (!current) return { error: 'No autenticado' }
+  if (current.role !== 'owner') return { error: 'Solo el dueño de la organizacion puede configurar los datos fiscales.' }
+
+  const rfc = input.rfc.trim().toUpperCase()
+  const razonSocial = input.razonSocial.trim()
+  const codigoPostal = input.codigoPostal.trim()
+
+  if (rfc.length < 12 || rfc.length > 13) {
+    return { error: 'El RFC debe tener 12 caracteres (persona moral) o 13 (persona fisica).' }
+  }
+  if (!razonSocial) {
+    return { error: 'La razon social es obligatoria.' }
+  }
+  if (!input.regimenFiscal) {
+    return { error: 'Selecciona un regimen fiscal.' }
+  }
+  if (!/^\d{5}$/.test(codigoPostal)) {
+    return { error: 'El codigo postal debe tener 5 digitos.' }
+  }
+  if (!input.usoCfdiDefault) {
+    return { error: 'Selecciona un uso de CFDI por default.' }
+  }
+
+  const supabase = await createClient()
+
+  const { data: existing } = await supabase
+    .from('fiscal_profiles')
+    .select('id')
+    .eq('organization_id', current.organization_id)
+    .maybeSingle()
+
+  const payload = {
+    rfc,
+    razon_social: razonSocial,
+    regimen_fiscal: input.regimenFiscal,
+    codigo_postal: codigoPostal,
+    uso_cfdi_default: input.usoCfdiDefault,
+  }
+
+  if (existing) {
+    const { error } = await supabase.from('fiscal_profiles').update(payload).eq('id', existing.id)
+    if (error) return { error: error.message }
+  } else {
+    const { error } = await supabase.from('fiscal_profiles').insert({
+      organization_id: current.organization_id,
+      ...payload,
+    })
+    if (error) return { error: error.message }
+  }
+
+  revalidatePath('/facturacion')
+  return { success: true }
 }
 
 export async function consultarCsdRegistrado() {

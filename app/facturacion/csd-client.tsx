@@ -1,9 +1,30 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
-import { uploadCsd, consultarCsdRegistrado } from './csd-actions'
+import { uploadCsd, consultarCsdRegistrado, guardarPerfilFiscal } from './csd-actions'
 
 type Csd = { id: string; valid_from: string | null; valid_until: string | null; created_at: string } | null
+type FiscalProfile = { rfc: string; razon_social: string; regimen_fiscal: string; codigo_postal: string; uso_cfdi_default: string } | null
+
+const REGIMENES = [
+  { value: '601', label: '601 - General de Ley Personas Morales' },
+  { value: '603', label: '603 - Personas Morales con Fines no Lucrativos' },
+  { value: '605', label: '605 - Sueldos y Salarios e Ingresos Asimilados a Salarios' },
+  { value: '606', label: '606 - Arrendamiento' },
+  { value: '608', label: '608 - Demas ingresos' },
+  { value: '612', label: '612 - Personas Fisicas con Actividades Empresariales y Profesionales' },
+  { value: '616', label: '616 - Sin obligaciones fiscales' },
+  { value: '621', label: '621 - Incorporacion Fiscal' },
+  { value: '625', label: '625 - Regimen Simplificado de Confianza (Personas Fisicas)' },
+  { value: '626', label: '626 - Regimen Simplificado de Confianza (Personas Morales)' },
+]
+
+const USOS_CFDI = [
+  { value: 'G01', label: 'G01 - Adquisicion de mercancias' },
+  { value: 'G03', label: 'G03 - Gastos en general' },
+  { value: 'S01', label: 'S01 - Sin efectos fiscales' },
+  { value: 'P01', label: 'P01 - Por definir' },
+]
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -18,7 +39,16 @@ function fileToBase64(file: File): Promise<string> {
   })
 }
 
-export default function CsdClient({ csd, role }: { csd: Csd; role: string }) {
+export default function CsdClient({ csd, fiscalProfile, role }: { csd: Csd; fiscalProfile: FiscalProfile; role: string }) {
+  const [perfil, setPerfil] = useState<FiscalProfile>(fiscalProfile)
+  const [rfc, setRfc] = useState(fiscalProfile?.rfc ?? '')
+  const [razonSocial, setRazonSocial] = useState(fiscalProfile?.razon_social ?? '')
+  const [regimenFiscal, setRegimenFiscal] = useState(fiscalProfile?.regimen_fiscal ?? '')
+  const [codigoPostal, setCodigoPostal] = useState(fiscalProfile?.codigo_postal ?? '')
+  const [usoCfdiDefault, setUsoCfdiDefault] = useState(fiscalProfile?.uso_cfdi_default ?? '')
+  const [guardandoPerfil, setGuardandoPerfil] = useState(false)
+  const [perfilResult, setPerfilResult] = useState<{ success?: boolean; error?: string } | null>(null)
+
   const [cerFile, setCerFile] = useState<File | null>(null)
   const [keyFile, setKeyFile] = useState<File | null>(null)
   const [password, setPassword] = useState('')
@@ -40,6 +70,23 @@ export default function CsdClient({ csd, role }: { csd: Csd; role: string }) {
         Solo el dueño de la organizacion puede configurar el CSD de facturacion.
       </p>
     )
+  }
+
+  const handleGuardarPerfil = async () => {
+    setGuardandoPerfil(true)
+    setPerfilResult(null)
+    const res = await guardarPerfilFiscal({ rfc, razonSocial, regimenFiscal, codigoPostal, usoCfdiDefault })
+    setGuardandoPerfil(false)
+    setPerfilResult(res)
+    if (res.success) {
+      setPerfil({
+        rfc: rfc.trim().toUpperCase(),
+        razon_social: razonSocial.trim(),
+        regimen_fiscal: regimenFiscal,
+        codigo_postal: codigoPostal.trim(),
+        uso_cfdi_default: usoCfdiDefault,
+      })
+    }
   }
 
   const handleSubmit = async () => {
@@ -64,8 +111,94 @@ export default function CsdClient({ csd, role }: { csd: Csd; role: string }) {
     }
   }
 
+  if (!perfil) {
+    return (
+      <div style={{ maxWidth: '480px' }}>
+        <div
+          style={{
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            padding: 'var(--space-3)',
+            marginBottom: 'var(--space-3)',
+          }}
+        >
+          <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+            Antes de subir tu CSD, captura los datos fiscales de tu negocio. Son los datos que aparecen como emisor en cada factura.
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+          <label style={fieldStyle}>
+            RFC
+            <input value={rfc} onChange={(e) => setRfc(e.target.value)} style={inputStyle} placeholder="Ej. EKU9003173C9" />
+          </label>
+
+          <label style={fieldStyle}>
+            Razon social
+            <input value={razonSocial} onChange={(e) => setRazonSocial(e.target.value)} style={inputStyle} placeholder="Debe coincidir exacto con lo registrado ante el SAT" />
+          </label>
+
+          <label style={fieldStyle}>
+            Regimen fiscal
+            <select value={regimenFiscal} onChange={(e) => setRegimenFiscal(e.target.value)} style={inputStyle}>
+              <option value="">Selecciona...</option>
+              {REGIMENES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+            </select>
+          </label>
+
+          <label style={fieldStyle}>
+            Codigo postal (lugar de expedicion)
+            <input value={codigoPostal} onChange={(e) => setCodigoPostal(e.target.value)} style={inputStyle} placeholder="Ej. 42501" maxLength={5} />
+          </label>
+
+          <label style={fieldStyle}>
+            Uso de CFDI por default
+            <select value={usoCfdiDefault} onChange={(e) => setUsoCfdiDefault(e.target.value)} style={inputStyle}>
+              <option value="">Selecciona...</option>
+              {USOS_CFDI.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
+            </select>
+          </label>
+
+          <button
+            onClick={handleGuardarPerfil}
+            disabled={guardandoPerfil}
+            style={{
+              padding: '0.85rem',
+              background: 'var(--accent)',
+              border: 'none',
+              borderRadius: 'var(--radius)',
+              color: '#1a1206',
+              fontWeight: 600,
+              cursor: guardandoPerfil ? 'not-allowed' : 'pointer',
+              marginTop: 'var(--space-1)',
+            }}
+          >
+            {guardandoPerfil ? 'Guardando...' : 'Guardar datos fiscales'}
+          </button>
+
+          {perfilResult?.error && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{perfilResult.error}</p>}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ maxWidth: '480px' }}>
+      <div
+        style={{
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)',
+          padding: 'var(--space-3)',
+          marginBottom: 'var(--space-3)',
+        }}
+      >
+        <p style={{ margin: '0 0 0.3rem', color: 'var(--success)', fontSize: '0.9rem' }}>
+          ✓ Datos fiscales configurados — {perfil.razon_social} ({perfil.rfc})
+        </p>
+      </div>
+
       {csd && (
         <div
           style={{

@@ -21,7 +21,7 @@ export default async function FacturacionPage() {
         </p>
       </header>
 
-      <CsdClient csd={result.csd ?? null} role={result.role ?? ''} />
+      <CsdClient csd={result.csd ?? null} fiscalProfile={result.fiscalProfile ?? null} role={result.role ?? ''} />
     </main>
   )
 }
