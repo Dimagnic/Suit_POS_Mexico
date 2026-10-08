@@ -18,6 +18,18 @@ export default async function Home() {
     .eq('id', user.id)
     .single()
 
+    if (appUser?.organization_id) {
+    const { data: csd } = await supabase
+      .from('csd_credentials')
+      .select('id')
+      .eq('organization_id', appUser.organization_id)
+      .maybeSingle()
+
+    if (!csd) {
+      redirect('/facturacion')
+    }
+  }
+
   const { data: misGiros } = await supabase
     .from('organization_giros')
     .select('id, status, giros(slug, nombre, icono, descripcion)')

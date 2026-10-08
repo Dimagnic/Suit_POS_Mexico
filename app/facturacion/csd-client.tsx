@@ -179,8 +179,11 @@ export default function CsdClient({ csd, fiscalProfile, role }: { csd: Csd; fisc
           }}
         >
           <p style={{ fontSize: '2rem', margin: '0 0 0.5rem' }}>🎉</p>
-          <p style={{ fontSize: '1.1rem', fontWeight: 600, margin: '0 0 0.5rem', color: 'var(--success)' }}>
+                    <p style={{ fontSize: '1.1rem', fontWeight: 600, margin: '0 0 0.5rem', color: 'var(--success)' }}>
             ¡Todo listo! Tu facturacion ya esta configurada.
+          </p>
+          <p style={{ color: 'var(--success)', fontSize: '0.85rem', margin: '0 0 0.5rem' }}>
+            ✓ Tu CSD fue verificado y registrado con Facturama (vigente del {result?.validFrom} al {result?.validUntil})
           </p>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: '0 0 var(--space-3)' }}>
             Ya puedes emitir facturas con tu propio RFC. El ultimo paso es activar el giro de negocio que vas a usar.
