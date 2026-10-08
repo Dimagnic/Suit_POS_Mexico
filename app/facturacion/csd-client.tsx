@@ -186,7 +186,7 @@ export default function CsdClient({ csd, fiscalProfile, role }: { csd: Csd; fisc
             Ya puedes emitir facturas con tu propio RFC. El ultimo paso es activar el giro de negocio que vas a usar.
           </p>
           <a
-            href="/"
+            href="/subscription"
             style={{
               display: 'inline-block',
               padding: '0.85rem 1.5rem',
