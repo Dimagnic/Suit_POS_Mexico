@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useTransition } from 'react'
 import { crearCheckoutParaGiro } from './actions'
@@ -11,6 +11,7 @@ type Giro = {
   icono: string | null
   categoria: string
   stripe_price_id: string | null
+  precio_mxn: number | null
   estado: string | null
 }
 
@@ -114,7 +115,9 @@ export default function SubscriptionClient({
                     opacity: isPending && loadingId === giro.id ? 0.6 : 1,
                   }}
                 >
-                  {isPending && loadingId === giro.id ? 'Redirigiendo...' : 'Activar — $299/mes'}
+                  {isPending && loadingId === giro.id
+                    ? 'Redirigiendo...'
+                    : `Activar — $${giro.precio_mxn ?? '?'}/mes`}
                 </button>
               ) : (
                 <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>No activo</span>

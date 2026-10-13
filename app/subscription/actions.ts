@@ -1,4 +1,4 @@
-'use server'
+﻿'use server'
 
 import { createClient } from '@/lib/supabase/server'
 import { stripe } from '@/lib/stripe/client'
@@ -25,7 +25,7 @@ export async function getGirosConEstado() {
 
   const { data: giros, error } = await supabase
     .from('giros')
-    .select('id, slug, nombre, icono, categoria, stripe_price_id')
+    .select('id, slug, nombre, icono, categoria, stripe_price_id, precio_mxn')
     .order('nombre')
 
   if (error) return { error: error.message }
@@ -64,7 +64,6 @@ export async function crearCheckoutParaGiro(giroId: string) {
     return { error: 'Ese giro no tiene un precio configurado.' }
   }
 
-  // Reutiliza o crea el Customer de Stripe de la organización
   let { data: platformSub } = await supabase
     .from('platform_subscriptions')
     .select('stripe_customer_id')
